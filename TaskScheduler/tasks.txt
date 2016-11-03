@@ -1,0 +1,4 @@
+Start,normal,Sound,Physics
+Sound,high,End
+Physics,low,End
+End,normal
