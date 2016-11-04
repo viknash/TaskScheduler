@@ -53,10 +53,8 @@ To Do
 11. Process KickDependentTasks based on ranking
 12. Augment ranking with heuristics based on last execution time for a task
 13. Implement data parallel tasks
-14. Implement parent task pointer
-15. Implement natvis for taskgraph, lockfree queue
-16. Assert on global new and delete
+14. Implement natvis for taskgraph, lockfree queue
 
 To Test
 1. Test allocator alignment
-2. 
+2. Test Ranking and parent task pointer
