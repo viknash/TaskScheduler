@@ -12,6 +12,8 @@ public:
     typedef BaseTask<MemInterface> Task;
     typedef BaseTaskGraph<MemInterface> TaskGraph;
     typedef BaseSubGraph<Task, MemInterface> SubGraph;
+    typedef vector<string, Allocator<string, MemInterface>> StringVector;
+    typedef vector<Task*, Allocator<Task*, MemInterface>> TaskVector;
 
     enum Priority
     {
@@ -25,7 +27,7 @@ public:
     struct Debug
     {
         string taskName;
-        vector<string> dependentTaskNames;
+        StringVector dependentTaskNames;
 
         const char* PriorityToString(Priority priority) const;
     };
@@ -37,13 +39,13 @@ public:
     };
 
     Priority taskPriority;
-    vector<Task*> dependentTasks;
+    TaskVector dependentTasks;
     SubGraph* subGraph;
     function <void()> runFunctor;
     Debug debug;
     Transient transient;
 
-    vector<Task*> kickTasks;
+    TaskVector kickTasks;
 
    BaseTask(BaseTaskGraph<MemInterface>& _taskGraph);
 

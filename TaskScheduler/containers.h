@@ -46,31 +46,20 @@ public:
     inline pointer allocate(size_type cnt, typename allocator<void>::const_pointer = 0)
     {
         cout << "Trying to allocate " << cnt << " objects in memory" << endl;
-        pointer new_memory = reinterpret_cast<pointer>(new(cnt * sizeof(T)));
+        pointer new_memory = reinterpret_cast<pointer>(operator new(cnt * sizeof(T)));
         cout << "Allocated " << cnt << " objects in memory at location:" << new_memory << endl;
         return new_memory;
     }
 
     inline void deallocate(pointer p, size_type n)
     {
-        delete(p);
+        operator delete(p, n * sizeof(T));
         cout << "Deleted " << n << " objects from memory" << endl;
     }
 
     inline size_type max_size() const
     {
         return numeric_limits<size_type>::max() / sizeof(T);
-    }
-
-    inline void construct(pointer p, const T& t)
-    {
-        cout << "Constructing at memory location:" << p << endl;
-        new(p) T(t);
-    }
-    inline void destroy(pointer p)
-    {
-        cout << "Destroying object at memory location:" << p << endl;
-        p->~T();
     }
 
     inline bool operator==(Allocator const&)
@@ -95,7 +84,6 @@ protected:
     //Use global new/delete
     void* DefaultMemInterface::operator new(size_t size)
     {
-        assert(size%ALIGNMENT == 0);
         cout << "custom new for size " << size << '\n';
         size_t alignment = ALIGNMENT;
         Metadata metadata = { 0 };
@@ -327,6 +315,7 @@ class LockFreeNodeDispenser : public MemInterface
 {
     typedef LockFreeNode<T, MemInterface> Node;
     typedef LockFreeNodeStack<T, MemInterface> NodeStack;
+    typedef vector<Node, Allocator<T, MemInterface>> NodeVector;
 
 public:
 
@@ -385,7 +374,7 @@ public:
 
 private:
     NodeStack dispenser;
-    vector<Node> array;
+    NodeVector array;
 };
 
 /// Multi Producer Multi Consumer Lock-free queue implementation

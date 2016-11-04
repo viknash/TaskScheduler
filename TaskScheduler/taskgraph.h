@@ -8,9 +8,10 @@ template <class MemInterface> class BaseThreadPool;
 template<class Task, class MemInterface>
 struct BaseSubGraph
 {
-    vector<Task*> headTasks;
-    vector<Task*> tailTasks;
-    vector<Task*> taskList;
+    typedef vector<Task*, Allocator<Task*, MemInterface>> TaskVector;
+    TaskVector headTasks;
+    TaskVector tailTasks;
+    TaskVector taskList;
 
     //Frame Rate
     //Periodic Updates
@@ -26,14 +27,17 @@ public:
     typedef BaseSubGraph<typename BaseTask<MemInterface>::Task, MemInterface> SubGraph;
     typedef LockFreeNodeDispenser<typename BaseTask<MemInterface>::Task*, MemInterface> TaskMemoryAllocator;
     typedef typename LockFreeQueue<MultiProducerMultiConsumer<typename BaseTask<MemInterface>::Task*, MemInterface, TaskMemoryAllocator>, typename BaseTask<MemInterface>::Task*, TaskMemoryAllocator*> TaskQueue;
+    typedef unordered_map<string, Task*, hash<string>, equal_to<string>, Allocator<pair<const string, Task*>, MemInterface>> TaskNameToTaskMap;
+    typedef vector<SubGraph*, Allocator<SubGraph*, MemInterface>> SubGraphVector;
+    typedef vector<Task*, Allocator<Task*, MemInterface>> TaskVector;
     typedef BaseThreadPool<MemInterface> ThreadPool;
     typedef Task* TaskList;
 
     struct Persistent
     {
-        vector<Task*> headTasks;
-        vector<Task*> tailTasks;
-        vector<SubGraph*> subGraphs;
+        TaskVector headTasks;
+        TaskVector tailTasks;
+        SubGraphVector subGraphs;
     };
 
     struct Transient
@@ -58,8 +62,8 @@ public:
 
     struct Debug
     {
-        unordered_map<string, Task*> taskNameToTask;
-        vector<Task*> taskList;
+        TaskNameToTaskMap taskNameToTask;
+        TaskVector taskList;
     };
 
 public:
@@ -77,7 +81,7 @@ public:
     Task* DequeueTask();
 
 private:
-    bool FindHead(vector<Task*>& headList);
+    bool FindHead(TaskVector& headList);
     size_t Size(TaskList taskList) const;
     void SetupTask(Task* task, uint32_t taskFileField, string str);
 
@@ -100,7 +104,7 @@ BaseTaskGraph<MemInterface>::BaseTaskGraph(ThreadPool& _pool) :
 template<class MemInterface>
 void BaseTaskGraph<MemInterface>::Initialize(SubGraph* graph)
 {
-    vector<Task*> *taskList;
+    TaskVector *taskList;
     if (graph)
     {
         taskList = &(graph->taskList);
@@ -123,7 +127,7 @@ void BaseTaskGraph<MemInterface>::Initialize(SubGraph* graph)
 }
 
 template<class MemInterface>
-bool BaseTaskGraph<MemInterface>::FindHead(vector<Task*>& headList)
+bool BaseTaskGraph<MemInterface>::FindHead(TaskVector& headList)
 {
     auto foundAtLeastOneHead = false;
     for (auto task : debug.taskList)
@@ -256,7 +260,7 @@ void BaseTaskGraph<MemInterface>::SetupTailKickers()
 
         },
             bind(
-                [](Task* tailTask, Task* _headTask, vector<Task*> *_tailTasks)
+                [](Task* tailTask, Task* _headTask, TaskVector *_tailTasks)
         {
             //Only add unique items
             auto result = find(begin(*_tailTasks), end(*_tailTasks), tailTask);
