@@ -55,8 +55,7 @@ To Do
 13. Implement data parallel tasks
 14. Implement parent task pointer
 15. Implement natvis for taskgraph, lockfree queue
-16. Implement stl allocators for vectors
-17. Assert on global new and delete
+16. Assert on global new and delete
 
 To Test
 1. Test allocator alignment

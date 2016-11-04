@@ -6,13 +6,14 @@ template <class MemInterface> class BaseThreadPool;
 template<class Task, class MemInterface> struct BaseSubGraph;
 
 template <class MemInterface>
-class BaseTask
+class BaseTask : public MemInterface
 {
 public:
     typedef BaseTask<MemInterface> Task;
     typedef BaseTaskGraph<MemInterface> TaskGraph;
     typedef BaseSubGraph<Task, MemInterface> SubGraph;
-    typedef vector<string, Allocator<string, MemInterface>> StringVector;
+    typedef basic_string<char, char_traits<char>, Allocator<char, MemInterface>> String;
+    typedef vector<String, Allocator<String, MemInterface>> StringVector;
     typedef vector<Task*, Allocator<Task*, MemInterface>> TaskVector;
 
     enum Priority
@@ -26,7 +27,7 @@ public:
 
     struct Debug
     {
-        string taskName;
+        String taskName;
         StringVector dependentTaskNames;
 
         const char* PriorityToString(Priority priority) const;

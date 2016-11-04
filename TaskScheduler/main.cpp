@@ -8,7 +8,32 @@
 #include "threadpool.h"
 #include "profile.h"
 
-template <> thread_local BaseThreadPool<DefaultMemInterface>::ThreadData* BaseThreadPool<DefaultMemInterface>::threadData;
+DefaultMemInterface gDefaultMemInterface;
+
+void * operator new(std::size_t n)
+{
+    //DebugBreak();
+    return gDefaultMemInterface.operator new(n);
+}
+void operator delete(void * p, std::size_t n)
+{
+    //DebugBreak();
+    gDefaultMemInterface.operator delete(p, n);
+}
+
+void *operator new[](std::size_t n)
+{
+    //DebugBreak();
+    return gDefaultMemInterface.operator new[](n);
+}
+
+void operator delete[](void *p, std::size_t n)
+{
+    //DebugBreak();
+    gDefaultMemInterface.operator delete[](p, n);
+}
+
+template <> thread_local BaseThreadPool<DefaultMemInterface>::ThreadData<DefaultMemInterface>* BaseThreadPool<DefaultMemInterface>::threadData;
 
 void RandomTimeTask(chrono::milliseconds minTaskTime, chrono::milliseconds maxTaskTime)
 {

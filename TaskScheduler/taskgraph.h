@@ -6,7 +6,7 @@ template <class MemInterface> class BaseTask;
 template <class MemInterface> class BaseThreadPool;
 
 template<class Task, class MemInterface>
-struct BaseSubGraph
+struct BaseSubGraph : public MemInterface
 {
     typedef vector<Task*, Allocator<Task*, MemInterface>> TaskVector;
     TaskVector headTasks;
@@ -24,10 +24,11 @@ public:
     static const uint32_t MAX_TASKS_PER_QUEUE = 200;
 
     typedef typename BaseTask<MemInterface>::Task Task;
+    typedef basic_string<char, char_traits<char>, Allocator<char, MemInterface>> String;
     typedef BaseSubGraph<typename BaseTask<MemInterface>::Task, MemInterface> SubGraph;
     typedef LockFreeNodeDispenser<typename BaseTask<MemInterface>::Task*, MemInterface> TaskMemoryAllocator;
-    typedef typename LockFreeQueue<MultiProducerMultiConsumer<typename BaseTask<MemInterface>::Task*, MemInterface, TaskMemoryAllocator>, typename BaseTask<MemInterface>::Task*, TaskMemoryAllocator*> TaskQueue;
-    typedef unordered_map<string, Task*, hash<string>, equal_to<string>, Allocator<pair<const string, Task*>, MemInterface>> TaskNameToTaskMap;
+    typedef typename LockFreeQueue<MultiProducerMultiConsumer<typename BaseTask<MemInterface>::Task*, MemInterface, TaskMemoryAllocator>, typename BaseTask<MemInterface>::Task*, MemInterface, TaskMemoryAllocator*> TaskQueue;
+    typedef unordered_map<String, Task*, hash<String>, equal_to<String>, Allocator<pair<const String, Task*>, MemInterface>> TaskNameToTaskMap;
     typedef vector<SubGraph*, Allocator<SubGraph*, MemInterface>> SubGraphVector;
     typedef vector<Task*, Allocator<Task*, MemInterface>> TaskVector;
     typedef BaseThreadPool<MemInterface> ThreadPool;
@@ -72,7 +73,7 @@ public:
     ~BaseTaskGraph();
 
     void Initialize(SubGraph* subGraph = nullptr);
-    void Load(string fileName);
+    void Load(String fileName);
     void SetupTailKickers();
     void DepthFirstVisitor(Task* task, function<void(Task*)> nodePreRunFunctor, function<void(Task*)> nodePostRunFunctor, function<void(Task*)> tailRunFunctor);
     void Kick();
@@ -83,7 +84,7 @@ public:
 private:
     bool FindHead(TaskVector& headList);
     size_t Size(TaskList taskList) const;
-    void SetupTask(Task* task, uint32_t taskFileField, string str);
+    void SetupTask(Task* task, uint32_t taskFileField, String str);
 
 private:
     TaskMemoryAllocator taskMemoryAllocator;
@@ -156,19 +157,20 @@ size_t BaseTaskGraph<MemInterface>::Size(TaskList taskList) const
 }
 
 template<class MemInterface>
-void BaseTaskGraph<MemInterface>::Load(string fileName)
+void BaseTaskGraph<MemInterface>::Load(String fileName)
 {
-    string line;
-    ifstream taskFile(fileName);
+    String line;
+    ifstream taskFile(fileName.c_str());
     while (getline(taskFile, line))
     {
-        istringstream iss(line);
-        string token;
+        typedef basic_istringstream<char, char_traits<char>, Allocator<char, MemInterface> > iStringstream;
+        iStringstream iss(line);
+        String token;
         auto newTask = new Task(*this);
         unsigned int taskFileField = 0;
         while (getline(iss, token, ','))
         {
-            std::cout << token << std::endl;
+            cout << token << std::endl;
             SetupTask(newTask, taskFileField, token);
             taskFileField++;
         }
@@ -221,15 +223,16 @@ void BaseTaskGraph<MemInterface>::Load(string fileName)
 
     for (auto tailTask : persistent.tailTasks)
     {
+        typedef set<Task*, less<Task*>, Allocator<Task*, MemInterface>> TaskSet;
         auto* subGraph = new SubGraph();
         subGraph->tailTasks.push_back(tailTask);
-        set<Task*> subGraphSet;
+        TaskSet subGraphSet;
         for (auto kickTask : tailTask->kickTasks)
         {
             subGraph->headTasks.push_back(kickTask);
             DepthFirstVisitor(kickTask,
                 bind(
-                    [](Task* node, set<Task*> *_subGraphSet, SubGraph* _subGraph)
+                    [](Task* node, TaskSet *_subGraphSet, SubGraph* _subGraph)
             {
                 _subGraphSet->insert(node);
                 node->subGraph = _subGraph;
@@ -308,7 +311,7 @@ BaseTaskGraph<MemInterface>::~BaseTaskGraph()
 }
 
 template<class MemInterface>
-void BaseTaskGraph<MemInterface>::SetupTask(Task* task, uint32_t taskFileField, string str)
+void BaseTaskGraph<MemInterface>::SetupTask(Task* task, uint32_t taskFileField, String str)
 {
     enum TaskFileField
     {

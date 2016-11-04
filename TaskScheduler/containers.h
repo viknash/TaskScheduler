@@ -34,11 +34,11 @@ public:
     };
 
 public:
-    inline explicit Allocator() {}
+    inline Allocator() {}
     inline ~Allocator() {}
-    inline explicit Allocator(Allocator const&) {}
+    inline Allocator(Allocator const&) {}
     template<typename U>
-    inline explicit Allocator(Allocator<U, MemInterface> const&) {}
+    inline Allocator(Allocator<U, MemInterface> const&) {}
 
     inline pointer address(reference r) { return &r; }
     inline const_pointer address(const_reference r) { return &r; }
@@ -62,7 +62,7 @@ public:
         return numeric_limits<size_type>::max() / sizeof(T);
     }
 
-    inline bool operator==(Allocator const&)
+    inline bool operator==(Allocator const&) const
     {
         return true;
     }
@@ -80,7 +80,7 @@ class DefaultMemInterface
         size_t space;
     };
 
-protected:
+public:
     //Use global new/delete
     void* DefaultMemInterface::operator new(size_t size)
     {
@@ -665,8 +665,8 @@ private:
     DEBUGONLY(Debug debug;);
 };
 
-template<class Policy, class T, class Param = void*>
-class LockFreeQueue
+template<class Policy, class T, class MemInterface, class Param = void*>
+class LockFreeQueue : public MemInterface
 {
 public:
     LockFreeQueue()

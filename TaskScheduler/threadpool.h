@@ -23,7 +23,8 @@ public:
         atomic<uint32_t> threadsNotStarted;
     };
 
-    struct ThreadData
+    template <class MemInterface>
+    struct ThreadData : public MemInterface
     {
         ThreadData() :
             threadIndex(numeric_limits<uint8_t>::max())
@@ -69,12 +70,12 @@ public:
     uint8_t numThreads;
 
     Setup setup;
-    ThreadData* threads[MAX_NUM_THREADS];
+    ThreadData<MemInterface>* threads[MAX_NUM_THREADS];
 
 private:
     TaskGraph* taskGraph;
     TaskMemoryAllocator taskMemoryAllocator;
-    thread_local static ThreadData* threadData;
+    thread_local static ThreadData<MemInterface>* threadData;
 };
 
 template <class MemInterface>
@@ -186,7 +187,7 @@ void BaseThreadPool<MemInterface>::Start(TaskGraph& _taskGraph)
     setup.threadsNotStarted.store(uint32_t(numThreads));
     for (uint32_t threadIdx = 0; threadIdx < numThreads; threadIdx++)
     {
-        ThreadData* thrData = new ThreadData();
+        ThreadData<MemInterface>* thrData = new ThreadData<MemInterface>();
         threads[threadIdx] = thrData;
         thrData->threadIndex = threadIdx;
         thrData->poolThread = CreateThread(threadIdx);
@@ -213,7 +214,7 @@ void BaseThreadPool<MemInterface>::End()
     mailbox.notify_all();
     for (uint32_t threadIdx = 0; threadIdx < numThreads; threadIdx++)
     {
-        ThreadData *thrData = threads[threadIdx];
+        ThreadData<MemInterface> *thrData = threads[threadIdx];
         thrData->poolThread.join();
         delete thrData;
     }
