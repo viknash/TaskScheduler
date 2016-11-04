@@ -15,6 +15,8 @@ public:
     typedef basic_string<char, char_traits<char>, Allocator<char, MemInterface>> String;
     typedef vector<String, Allocator<String, MemInterface>> StringVector;
     typedef vector<Task*, Allocator<Task*, MemInterface>> TaskVector;
+    typedef function <void()> Function;
+    typedef int64_t Rank;
 
     enum Priority
     {
@@ -27,92 +29,87 @@ public:
 
     struct Debug
     {
+        const char* PriorityToString(Priority priority) const
+        {
+            static const char* PriorityToString[] =
+            {
+                "REALTIME",
+                "HIGH",
+                "NORMAL",
+                "LOW"
+            };
+
+            return PriorityToString[uint32_t(priority)];
+        }
+
         String taskName;
         StringVector dependentTaskNames;
-
-        const char* PriorityToString(Priority priority) const;
     };
 
     struct Transient
     {
         atomic_int64_t  startGate;
-        atomic<Task*>   nextTask;
     };
 
-    Priority taskPriority;
-    TaskVector dependentTasks;
-    SubGraph* subGraph;
-    function <void()> runFunctor;
+    struct Persistent
+    {
+        Persistent() :
+            taskPriority(NORMAL),
+            subGraph(nullptr)
+        {}
+
+        Priority taskPriority;
+        TaskVector parentTasks;
+        TaskVector dependentTasks;
+        TaskVector kickTasks;
+        Function runFunctor;
+        SubGraph* subGraph;
+        Rank rank;
+    };
+
+    BaseTask(TaskGraph& _taskGraph) :
+        taskGraph(_taskGraph)
+    {
+
+    }
+
+    void KickDependentTasks()
+    {
+        //Queue dependent tasks only when their start gates are 0
+        //i.e. all parent tasks have been executed
+        for (auto dependentTask : persistent.dependentTasks)
+        {
+            if (--dependentTask->transient.startGate == 0)
+            {
+                taskGraph.QueueTask(dependentTask);
+            }
+        }
+
+        //Only Tail Task Nodes should have kick tasks
+        //Kick tasks are Head Tasks for the next frame
+        bool initializedSubGraph = false;
+        for (auto kickTask : persistent.kickTasks)
+        {
+            if (!initializedSubGraph)
+            {
+                taskGraph.Initialize(kickTask->persistent.subGraph);
+                initializedSubGraph = true;
+            }
+            uint64_t startGate = kickTask->transient.startGate.load();
+            assert(startGate == 0);
+            taskGraph.QueueTask(kickTask);
+        }
+    }
+
+    void operator()()
+    {
+        persistent.runFunctor();
+    }
+
     Debug debug;
     Transient transient;
+    Persistent persistent;
 
-    TaskVector kickTasks;
-
-   BaseTask(BaseTaskGraph<MemInterface>& _taskGraph);
-
-    void KickDependentTasks();
-    void operator()();
 private:
-    BaseTaskGraph<MemInterface>& taskGraph;
+    TaskGraph& taskGraph;
 };
-
-//typedef BaseTask<DefaultMemInterface>* TaskList;
-
-//typedef BaseTask<DefaultMemInterface> Task;
-
-template <class MemInterface>
-BaseTask<MemInterface>::BaseTask(BaseTaskGraph<MemInterface>& _taskGraph) :
-    taskPriority(NORMAL),
-    taskGraph(_taskGraph)
-{
-
-}
-
-template <class MemInterface>
-const char* BaseTask<MemInterface>::Debug::PriorityToString(Priority priority) const
-{
-    static const char* PriorityToString[] =
-    {
-        "REALTIME",
-        "HIGH",
-        "NORMAL",
-        "LOW"
-    };
-
-    return PriorityToString[uint32_t(priority)];
-}
-
-template <class MemInterface>
-void BaseTask<MemInterface>::KickDependentTasks()
-{
-    //Queue dependent tasks only when their start gates are 0
-    //i.e. all parent tasks have been executed
-    for (auto dependentTask : dependentTasks)
-    {
-        if (--dependentTask->transient.startGate == 0)
-        {
-            taskGraph.QueueTask(dependentTask);
-        }
-    }
-
-    //Only Tail Task Nodes should have kick tasks
-    //Kick tasks are Head Tasks for the next frame
-    bool initializedSubGraph = false;
-    for (auto kickTask : kickTasks)
-    {
-        if (!initializedSubGraph)
-        {
-            taskGraph.Initialize(kickTask->subGraph);
-            initializedSubGraph = true;
-        }
-        uint64_t startGate = kickTask->transient.startGate.load();
-        assert(startGate == 0);
-        taskGraph.QueueTask(kickTask);
-    }
-}
-
-template <class MemInterface>
-void BaseTask<MemInterface>::operator()()
-{
-    runFunctor();
-}

@@ -67,7 +67,7 @@ int main()
 
     for (auto& task : taskGraph.debug.taskList)
     {
-        task->runFunctor = bind(RandomTimeTask, 1ms, 16ms);
+        task->persistent.runFunctor = bind(RandomTimeTask, 1ms, 16ms);
     }
 
     pool.Start(taskGraph);
