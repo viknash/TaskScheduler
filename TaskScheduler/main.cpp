@@ -5,35 +5,36 @@
 #include "containers.h"
 #include "task.h"
 #include "taskgraph.h"
+#include "thread.h"
 #include "threadpool.h"
 #include "profile.h"
 
 DefaultMemInterface gDefaultMemInterface;
 
-void * operator new(std::size_t n)
+void* operator new(size_t n)
 {
     //DebugBreak();
     return gDefaultMemInterface.operator new(n);
 }
-void operator delete(void * p, std::size_t n)
+void operator delete(void* p, size_t n)
 {
     //DebugBreak();
     gDefaultMemInterface.operator delete(p, n);
 }
 
-void *operator new[](std::size_t n)
+void *operator new[](size_t n)
 {
     //DebugBreak();
     return gDefaultMemInterface.operator new[](n);
 }
 
-void operator delete[](void *p, std::size_t n)
+void operator delete[](void* p, size_t n)
 {
     //DebugBreak();
     gDefaultMemInterface.operator delete[](p, n);
 }
 
-template <> thread_local BaseThreadPool<DefaultMemInterface>::ThreadData<DefaultMemInterface>* BaseThreadPool<DefaultMemInterface>::threadData;
+template <> thread_local BaseThread<DefaultMemInterface>* BaseThreadPool<DefaultMemInterface>::currentThread = nullptr;
 
 void RandomTimeTask(chrono::milliseconds minTaskTime, chrono::milliseconds maxTaskTime)
 {
@@ -72,7 +73,7 @@ int main()
 
     pool.Start(taskGraph);
     taskGraph.Kick();
-    this_thread::sleep_for(5s);
+    this_thread::sleep_for(30s);
     pool.End();
     system("pause");
     return 0;

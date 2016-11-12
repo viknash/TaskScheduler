@@ -42,19 +42,16 @@ should add to or customize.
 To Do
 1. Convert LockFreeNodes+Tasks to an Intrusive list
 2. Create one dispenser for all tasks
-3. Hookup all classes to the same interface
 4. Implement Thread Memory Allocators
 5. Implement Thread Memory Reclamation Lock Free List
 6. Run Thread Memory Reclamation before thread sleeps and periodically
-7. Remove central task queue in task graph
-8. Implement queue ranking
-9. KickDependentTasks will select thread based on thread ranking
 10. Implement Ranking for each task based on their the cumulative number of dependents
-11. Process KickDependentTasks based on ranking
 12. Augment ranking with heuristics based on last execution time for a task
 13. Implement data parallel tasks
 14. Implement natvis for taskgraph, lockfree queue
+15. Exit pool only when all tail tasks from all the task graphs are complete. Don't kick new tasks from the tail
 
 To Test
 1. Test allocator alignment
 2. Test Ranking and parent task pointer
+3. Test task dependents sorting

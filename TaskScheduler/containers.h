@@ -1,5 +1,8 @@
 #pragma once
 
+#define optimization
+#define reduce_starvation(...)
+
 #if defined(_DEBUG)
 #define DEBUGONLY(x) x
 #else
@@ -45,16 +48,16 @@ public:
 
     inline pointer allocate(size_type cnt, typename allocator<void>::const_pointer = 0)
     {
-        cout << "Trying to allocate " << cnt << " objects in memory" << endl;
+        //cout << "Trying to allocate " << cnt << " objects in memory" << endl;
         pointer new_memory = reinterpret_cast<pointer>(operator new(cnt * sizeof(T)));
-        cout << "Allocated " << cnt << " objects in memory at location:" << new_memory << endl;
+        //cout << "Allocated " << cnt << " objects in memory at location:" << new_memory << endl;
         return new_memory;
     }
 
     inline void deallocate(pointer p, size_type n)
     {
         operator delete(p, n * sizeof(T));
-        cout << "Deleted " << n << " objects from memory" << endl;
+        //cout << "Deleted " << n << " objects from memory" << endl;
     }
 
     inline size_type max_size() const
@@ -84,7 +87,7 @@ public:
     //Use global new/delete
     void* DefaultMemInterface::operator new(size_t size)
     {
-        cout << "custom new for size " << size << '\n';
+        //cout << "custom new for size " << size << '\n';
         size_t alignment = ALIGNMENT;
         Metadata metadata = { 0 };
         metadata.space = size + sizeof(Metadata) + alignment;
@@ -98,13 +101,13 @@ public:
 
     void* DefaultMemInterface::operator new[](size_t counter)
     {
-        cout << "custom new for size " << counter << '\n';
+        //cout << "custom new for size " << counter << '\n';
         return operator new(counter);
     }
 
     void operator delete(void* ptr, size_t size)
     {
-        cout << "custom delete for size " << size << '\n';
+        //cout << "custom delete for size " << size << '\n';
         size_t alignment = ALIGNMENT;
         void* aligned_pointer = ptr;
         Metadata* metadata = (Metadata*)((char*)aligned_pointer + size);
@@ -114,7 +117,7 @@ public:
 
     void operator delete[](void* ptr, size_t counter)
     {
-        cout << "custom delete for size " << counter << '\n';
+        //cout << "custom delete for size " << counter << '\n';
         operator delete(ptr, counter);
     }
 };

@@ -75,25 +75,29 @@ public:
     void Initialize(SubGraph* subGraph = nullptr);
     void Load(String fileName);
     void SetupTailKickers();
-    void DepthFirstVisitor(Task* task, function<void(Task*, void*&)> nodePreRunFunctor, function<void(Task*, void*&)> nodePostRunFunctor, function<void(Task*, void*&)> tailRunFunctor, void* param);
+    void DepthFirstVisitor(Task* task,
+        function<void(Task*, void*&)> preOrderFunctor,
+        function<void(Task*, void*&)> inOrderFunctor,
+        function<void(Task*, void*&)> postOrderFunctor,
+        function<void(Task*, void*&)> tailFunctor,
+        void* param,
+        bool  bottomUp = false);
     void Kick();
 
     void QueueTask(Task* task);
-    Task* DequeueTask();
+    Task* DequeueTask(uint32_t priority);
 
 private:
     bool FindHead(TaskVector& headList);
     size_t Size(TaskList taskList) const;
     void SetupTask(Task* task, uint32_t taskFileField, String str);
-
-private:
     TaskMemoryAllocator taskMemoryAllocator;
-    ThreadPool& pool;
 
 public:
     Persistent persistent;
     Transient transient;
     Debug debug;
+    ThreadPool& pool;
 };
 
 template<class MemInterface>
@@ -219,12 +223,12 @@ void BaseTaskGraph<MemInterface>::Load(String fileName)
     }
 #endif //DEBUG
 
+    typedef set<Task*, less<Task*>, Allocator<Task*, MemInterface>> TaskSet;
+
     //Setup Subgraphs
     //Each subgraph has only 1 tail, so we get the heads in the tail to traverse all nodes to build a graph
-
     for (auto tailTask : persistent.tailTasks)
     {
-        typedef set<Task*, less<Task*>, Allocator<Task*, MemInterface>> TaskSet;
         auto* subGraph = new SubGraph();
         subGraph->tailTasks.push_back(tailTask);
         TaskSet subGraphSet;
@@ -240,37 +244,56 @@ void BaseTaskGraph<MemInterface>::Load(String fileName)
                 node->persistent.subGraph = _subGraph;
             },
                     _1, _2, &subGraphSet, subGraph),
-                [](Task* nodeTask, void*& param) {},
-                [](Task* nodeTask, void*& param) {},
+                nullptr,
+                nullptr,
+                nullptr,
                 param
             );
         }
         copy(subGraphSet.begin(), subGraphSet.end(), back_inserter(subGraph->taskList));
         persistent.subGraphs.push_back(subGraph);
     }
+    
+    TaskSet rankedTasks;
+    function<void(Task*,void*&)> rankingFunc = [](Task* nodeTask, void*& param) {
+        param = (void*)1;
+        nodeTask->persistent.rank += (Task::Rank)(param);
+        cout << nodeTask->debug.taskName << " - Rank :" << int32_t(nodeTask->persistent.rank) << endl;
+    };
 
     //Rank Nodes
     for (auto subGraph : persistent.subGraphs)
     {
         for (auto bottomHeadTask : subGraph->tailTasks)
         {
-            bottomHeadTask->persistent.rank = (Task::Rank)bottomHeadTask->persistent.dependentTasks.size();
-            void* param = (void*)bottomHeadTask->persistent.rank;
+            //bottomHeadTask->persistent.rank = (Task::Rank)bottomHeadTask->persistent.dependentTasks.size();
+            void* param = nullptr;// (void*)bottomHeadTask->persistent.rank;
             DepthFirstVisitor(bottomHeadTask,
-                [](Task* nodeTask, void*& param) {
-                    param = (void*)( (Task::Rank)(param) + nodeTask->persistent.dependentTasks.size() );
-                    nodeTask->persistent.rank = (Task::Rank)(param);
-                },
-                [](Task* nodeTask, void*& param) {},
-                [](Task* nodeTask, void*& param) {},
-                param
+                rankingFunc,
+                nullptr,
+                nullptr,
+                nullptr,
+                param,
+                true
             );
 
         }
     }
 
-}
+    struct rank_sorter {
+        static bool compare(Task* &a, Task* &b)
+        {
+            return (a->persistent.rank < b->persistent.rank ? true : false);
+        }
+    };
 
+    //Sort dependent tasks for each task based on rank
+    for (auto& task : debug.taskList)
+    {
+        sort(task->persistent.dependentTasks.begin(), task->persistent.dependentTasks.end(), rank_sorter::compare);
+    }
+
+}
 
 template<class MemInterface>
 void BaseTaskGraph<MemInterface>::SetupTailKickers()
@@ -279,46 +302,65 @@ void BaseTaskGraph<MemInterface>::SetupTailKickers()
     {
         void* param = nullptr;
         DepthFirstVisitor(headTask,
-            [](Task* nodeTask, void*& param)
-        {
-
-        },
-            [](Task* nodeTask, void*& param)
-        {
-
-        },
+            nullptr,
+            nullptr,
+            nullptr,
             bind(
                 [](Task* tailTask, void*& param, Task* _headTask, TaskVector *_tailTasks)
-        {
-            //Only add unique items
-            auto result = find(begin(*_tailTasks), end(*_tailTasks), tailTask);
-            if (result == end(*_tailTasks))
-            {
-                tailTask->persistent.kickTasks.push_back(_headTask);
-                _tailTasks->push_back(tailTask);
-            }
-        },
-                _1, _2, headTask, &persistent.tailTasks),
+                {
+                    //Only add unique items
+                    auto result = find(begin(*_tailTasks), end(*_tailTasks), tailTask);
+                    if (result == end(*_tailTasks))
+                    {
+                        tailTask->persistent.kickTasks.push_back(_headTask);
+                        _tailTasks->push_back(tailTask);
+                    }
+                },
+                _1, _2, headTask, &persistent.tailTasks
+            ),
             param
-            );
+        );
     }
 }
 
-
 template<class MemInterface>
-void BaseTaskGraph<MemInterface>::DepthFirstVisitor(Task* task, function<void(Task*, void*&)> nodePreRunFunctor, function<void(Task*, void*&)> nodePostRunFunctor, function<void(Task*, void*&)> tailRunFunctor, void* param)
+void BaseTaskGraph<MemInterface>::DepthFirstVisitor(Task* task,
+    function<void(Task*, void*&)> preOrderFunctor,
+    function<void(Task*, void*&)> inOrderFunctor,
+    function<void(Task*, void*&)> postOrderFunctor,
+    function<void(Task*, void*&)> tailFunctor,
+    void* param,
+    bool  bottomup
+)
 {
-    nodePreRunFunctor(task, param);
-    if (task->persistent.dependentTasks.size() == 0)
+    if (preOrderFunctor) preOrderFunctor(task, param);
+    if (bottomup)
     {
-        tailRunFunctor(task, param);
-        return;
+        if (task->persistent.parentTasks.size() == 0)
+        {
+            if (tailFunctor) tailFunctor(task, param);
+            return;
+        }
+        for (auto parentTask : task->persistent.parentTasks)
+        {
+            DepthFirstVisitor(parentTask, preOrderFunctor, inOrderFunctor, postOrderFunctor, tailFunctor, param, bottomup);
+            if (inOrderFunctor) inOrderFunctor(task, param);
+        }
     }
-    for (auto dependentTask : task->persistent.dependentTasks)
+    else
     {
-        DepthFirstVisitor(dependentTask, nodePreRunFunctor, nodePostRunFunctor, tailRunFunctor, param);
+        if (task->persistent.dependentTasks.size() == 0)
+        {
+            if (tailFunctor) tailFunctor(task, param);
+            return;
+        }
+        for (auto dependentTask : task->persistent.dependentTasks)
+        {
+            DepthFirstVisitor(dependentTask, preOrderFunctor, inOrderFunctor, postOrderFunctor, tailFunctor, param, bottomup);
+            if (inOrderFunctor) inOrderFunctor(task, param);
+        }
     }
-    nodePostRunFunctor(task, param);
+    if (postOrderFunctor) postOrderFunctor(task, param);
 }
 
 template<class MemInterface>
@@ -392,20 +434,14 @@ void BaseTaskGraph<MemInterface>::QueueTask(Task* task)
     } while (!transient.taskQueue[priority]->push_back(task) && ++priority < Task::NUM_PRIORITY);
     assert(priority < Task::NUM_PRIORITY);
 
-    pool.mailbox.notify_one();
+    pool.Wakeup();
 }
 
 template<class MemInterface>
-typename BaseTask<MemInterface>::Task* BaseTaskGraph<MemInterface>::DequeueTask()
+typename BaseTask<MemInterface>::Task* BaseTaskGraph<MemInterface>::DequeueTask(uint32_t priority)
 {
     Task *nextTask = nullptr;
-    for (uint32_t priority = 0; priority < Task::NUM_PRIORITY; priority++)
-    {
-        if (transient.taskQueue[priority]->pop_front(nextTask))
-        {
-            break;
-        }
-    }
+    transient.taskQueue[priority]->pop_front(nextTask);
     return nextTask;
 }
 

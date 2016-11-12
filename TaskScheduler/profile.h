@@ -19,3 +19,10 @@ struct ProfileTimer
     ProfileTimePoint start;
     ProfileTime& elapsedTime;
 };
+
+template<typename ReturnType, typename ClassType, typename MemFunc, typename ...Args>
+ReturnType Instrument(ProfileTime& profileTime, ClassType* classType, MemFunc func, Args... params)
+{
+    ProfileTimer profile(profileTime);
+    return (classType->*func)(std::forward<Args>(params)...);
+}
