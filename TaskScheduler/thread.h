@@ -22,7 +22,7 @@ struct BaseThread : public MemInterface
 
     static Thread* CreateThread(ThreadPool* pool);
 
-    void Sleep();
+    void Sleep(bool(Thread::*wakeUp)());
     void Wakeup();
     void Join();
 
@@ -37,6 +37,7 @@ struct BaseThread : public MemInterface
 private:
     void Init();
     void Run();
+    bool IsTaskAvailable();
     Task* GetTask();
 
     ThreadPool& pool;
@@ -93,15 +94,19 @@ void BaseThread<MemInterface>::Init()
 }
 
 template <class MemInterface>
-void BaseThread<MemInterface>::Sleep()
+void BaseThread<MemInterface>::Sleep(bool (Thread::*wakeUp)())
 {
     unique_lock<mutex> signalLock(signal);
-    radio.wait(signalLock);
+    while (!(this->*wakeUp)())
+    {
+        radio.wait(signalLock);
+    }
 }
 
 template <class MemInterface>
 void BaseThread<MemInterface>::Wakeup()
 {
+    unique_lock<mutex> signalLock(signal);
     radio.notify_one();
 }
 
@@ -109,6 +114,20 @@ template <class MemInterface>
 void BaseThread<MemInterface>::Join()
 {
     taskThread.join();
+}
+
+template <class MemInterface>
+bool BaseThread<MemInterface>::IsTaskAvailable()
+{
+   for(auto queue : taskQueue)
+   {
+       if (!queue->empty())
+       {
+           return true;
+       }
+   }
+
+   return  pool.taskGraph->IsTaskAvailable();
 }
 
 template <class MemInterface>
@@ -135,10 +154,10 @@ void BaseThread<MemInterface>::Run()
             //Donate More Tasks
             Instrument<void, Task, void(Task::*)()>(scheduling, runTask, &Task::KickDependentTasks);
         }
-        else
+        else if (!IsTaskAvailable())
         {
             //Go to sleep if there is no task to run
-            Instrument<void, Thread, void(Thread::*)()>(sleeping, this, &Thread::Sleep);
+            Instrument<void, Thread, void(Thread::*)( bool(Thread::*)() ) >(sleeping, this, &Thread::Sleep, &Thread::IsTaskAvailable);
         }
 
         //Check if we need to exit thread

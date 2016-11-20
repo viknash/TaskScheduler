@@ -116,7 +116,7 @@ public:
                 uint32_t dependentTaskPriority = dependentTask->persistent.taskPriority;
                 do {
                 } while (!bestThread->taskQueue[dependentTaskPriority]->push_back(dependentTask) && ++dependentTaskPriority < Task::NUM_PRIORITY);
-                assert(priority < Task::NUM_PRIORITY);
+                assert(dependentTaskPriority < Task::NUM_PRIORITY);
 
                 //Wakeup thread if its sleeping
                 bestThread->Wakeup();

@@ -86,6 +86,7 @@ public:
 
     void QueueTask(Task* task);
     Task* DequeueTask(uint32_t priority);
+    bool IsTaskAvailable();
 
 private:
     bool FindHead(TaskVector& headList);
@@ -445,3 +446,15 @@ typename BaseTask<MemInterface>::Task* BaseTaskGraph<MemInterface>::DequeueTask(
     return nextTask;
 }
 
+template <class MemInterface>
+bool BaseTaskGraph<MemInterface>::IsTaskAvailable()
+{
+    for (auto queue : transient.taskQueue)
+    {
+        if (!queue->empty())
+        {
+            return true;
+        }
+    }
+    return  false;
+}
