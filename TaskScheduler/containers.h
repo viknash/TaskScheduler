@@ -1,128 +1,7 @@
 #pragma once
 
-#define optimization
-#define reduce_starvation(...)
-
-#if defined(_DEBUG)
-#define DEBUGONLY(x) x
-#else
-#define DEBUGONLY(x)
-#endif
-
-#define ALIGNMENT 16
-
-#pragma pack(ALIGNMENT)
-#define class_alignment alignas(ALIGNMENT)
-
-
-template <class T, class MemInterface>
-class Allocator : public MemInterface
-{
-public:
-    //    typedefs
-    typedef T value_type;
-    typedef value_type* pointer;
-    typedef const value_type* const_pointer;
-    typedef value_type& reference;
-    typedef const value_type& const_reference;
-    typedef size_t size_type;
-    typedef ptrdiff_t difference_type;
-
-public:
-    //    convert an allocator<T> to allocator<U>
-
-    template<typename U, class MemInterface>
-    struct rebind {
-        typedef Allocator<U, MemInterface> other;
-    };
-
-public:
-    inline Allocator() {}
-    inline ~Allocator() {}
-    inline Allocator(Allocator const&) {}
-    template<typename U>
-    inline Allocator(Allocator<U, MemInterface> const&) {}
-
-    inline pointer address(reference r) { return &r; }
-    inline const_pointer address(const_reference r) { return &r; }
-
-    inline pointer allocate(size_type cnt, typename allocator<void>::const_pointer = 0)
-    {
-        //cout << "Trying to allocate " << cnt << " objects in memory" << endl;
-        pointer new_memory = reinterpret_cast<pointer>(operator new(cnt * sizeof(T)));
-        //cout << "Allocated " << cnt << " objects in memory at location:" << new_memory << endl;
-        return new_memory;
-    }
-
-    inline void deallocate(pointer p, size_type n)
-    {
-        operator delete(p, n * sizeof(T));
-        //cout << "Deleted " << n << " objects from memory" << endl;
-    }
-
-    inline size_type max_size() const
-    {
-        return numeric_limits<size_type>::max() / sizeof(T);
-    }
-
-    inline bool operator==(Allocator const&) const
-    {
-        return true;
-    }
-
-    inline bool operator!=(Allocator const& a)
-    {
-        return !operator==(a);
-    }
-};
-
-class DefaultMemInterface
-{
-    struct Metadata
-    {
-        size_t space;
-    };
-
-public:
-    //Use global new/delete
-    void* DefaultMemInterface::operator new(size_t size)
-    {
-        //cout << "custom new for size " << size << '\n';
-        size_t alignment = ALIGNMENT;
-        Metadata metadata = { 0 };
-        metadata.space = size + sizeof(Metadata) + alignment;
-        void* raw_pointer = malloc(metadata.space);
-        assert(raw_pointer);
-        void* aligned_pointer = align(alignment, size + sizeof(Metadata), raw_pointer, metadata.space);
-        assert(aligned_pointer);
-        *(Metadata*)((char*)aligned_pointer + size) = metadata;
-        return aligned_pointer;
-    }
-
-    void* DefaultMemInterface::operator new[](size_t counter)
-    {
-        //cout << "custom new for size " << counter << '\n';
-        return operator new(counter);
-    }
-
-    void operator delete(void* ptr, size_t size)
-    {
-        //cout << "custom delete for size " << size << '\n';
-        size_t alignment = ALIGNMENT;
-        void* aligned_pointer = ptr;
-        Metadata* metadata = (Metadata*)((char*)aligned_pointer + size);
-        void* raw_pointer = (void*)((char*)aligned_pointer - (size + sizeof(Metadata) + alignment - metadata->space));
-        free(raw_pointer);
-    }
-
-    void operator delete[](void* ptr, size_t counter)
-    {
-        //cout << "custom delete for size " << counter << '\n';
-        operator delete(ptr, counter);
-    }
-};
-
-static_assert(sizeof(DefaultMemInterface) == 1, "Not an empty base class");
+#include "utils.h"
+#include "memory.h"
 
 namespace Atomic
 {
@@ -204,7 +83,7 @@ struct class_alignment LockFreeNode : public MemInterface
     AtomicNode next;
     T value;
 
-    static_assert(sizeof(T) <= sizeof(Address), "The size is not really important, but T should be a POD.");
+    static_assert(sizeof(T) <= sizeof(Address), "T must be a POD");
 };
 static_assert(sizeof(LockFreeNode<void*, DefaultMemInterface>) == sizeof(Address) * 2, "Size of AtomicLockFreeNode is incorrect.");
 
@@ -283,10 +162,6 @@ public:
             {
                 return nullptr;
             }
-
-            // NOTE: Memory reclamation is difficult in this context.  If another thread breaks in here
-            // and pops the head, and then frees it, then pHead->m_next is an invalid operation.  One solution
-            // would be to use hazard pointers (http://researchweb.watson.ibm.com/people/m/michael/ieeetpds-2004.pdf).
 
             incCopy.data.access.as_atomic = copy.data.access.as_atomic + 1;
             incCopy.data.points_to.node = copy.data.points_to.node->next.node;
@@ -380,11 +255,10 @@ private:
     NodeVector array;
 };
 
-/// Multi Producer Multi Consumer Lock-free queue implementation
-/*!
-Elements are contained into single-chained nodes provided by a LockFreeNodeDispenser.
-\param T Name of the type of object in the container
-*/
+// Multi Producer Multi Consumer Lock-free queue implementation
+// Elements are contained into single-chained nodes provided by a LockFreeNodeDispenser.
+// param T Name of the type of object in the container
+
 template<typename T, class MemInterface, class Dispenser>
 class MultiProducerMultiConsumer
 {
@@ -437,8 +311,7 @@ public:
             DEBUGONLY(Atomic::increment(debug.counter););
         }
 
-        // If the tail points to what we thought was the last LockFreeNode
-        // then update the tail to point to the new LockFreeNode.
+        // If the tail remains the same then update the tail
         AtomicNodePointer newTail;
         newTail.data.access.as_atomic = tailSnapshot.data.access.as_atomic + 1;
         newTail.data.points_to.node = newNode.node;
@@ -447,59 +320,43 @@ public:
         return true;
     }
 
-    /*! Retrieve the next object from the queue without removing it from the queue
-    \param _out Object retrieved from the queue
-    \return Returns false if the queue is empty or desynchronized; see the comment of the return
-    value of Remove().
-    */
     inline bool peek(T& _out)
     {
         T value = T();
         AtomicNodePointer headSnapshot;
         Node * nextSnapshot;
         bool ret = true;
+        bool skip = false;
 
         do
         {
+            skip = false;
             headSnapshot = head;
             nextSnapshot = headSnapshot.data.points_to.node->next;
 
             if (headSnapshot.data.access != head.data.access)
             {
+                skip = true;
                 continue;
             }
 
             if (nextSnapshot == endNode.node)
             {
-                // Removed as it's not completely true as the may have changed
-                // during reading the setup as we only check if the head
-                // changed not the tail
                 _out = T();
                 ret = false;
                 break;
             }
 
             DEBUGONLY(if (!nextSnapshot) continue;)
-                value = nextSnapshot->load();
+            value = nextSnapshot->load();
 
-            // Check if the head pointer changed. If so try to read it again
-            // this will ensure we have a proper value and not something that
-            // changed concurrently with this method
-        } while (!head.compare_exchange_weak(headSnapshot, headSnapshot));
+        } while (skip || !head.compare_exchange_weak(headSnapshot, headSnapshot));
 
         _out = value;
 
         return ret;
     }
 
-    /*! Remove an object from the queue
-    \param _out Object removed from the queue
-    \return Returns true if an object is removed from the queue. In fact, most of the time a false
-    value would mean an empty queue, but it can also mean that the internal state of the queue is
-    desynchronized by another thread who is also manipulating the state of the queue. This is
-    perfectly legal and the queue will resynchronize itself during a subsequent function call other
-    than IsEmpty().
-    */
     inline bool pop_front(T& _out)
     {
         Node* node = InternalRemove();
@@ -512,69 +369,13 @@ public:
         return true;
     }
 
-    /*! Remove the next object from the queue only if it is the one specified
-    \param _out Object to remove from the queue
-    */
-    inline void pop_back(const T& _out)
-    {
-        T value = T();
-        AtomicNodePointer pHead, pTail, newHead;;
-        Node * pNext;
-        bool bSuccess = true;
-
-        for (;;)
-        {
-            pHead = head;
-            pNext = pHead.data.points_to.node->next;
-            pTail = tail;
-
-            if (pHead.data.access != head.data.access)
-            {
-                continue;
-            }
-
-            if (pNext == endNode.node)
-            {
-                // Removed as it's not completely true as the may have changed during reading the setup
-                // as we only check if the head changed not the tail
-                //assert( pHead.data.m_node == pTail.data.m_node );
-                bSuccess = false;
-                break;
-            }
-
-            // Check if the queue is empty.
-            if (pHead.data.points_to.node == pTail.data.points_to.node)
-            {
-                // Special case if the queue has nodes but the tail
-                // is just behind. Move the tail off of the head.
-                UpdateTail(pTail);
-                continue;
-            }
-
-            DEBUGONLY(if (!pNext) break; );
-            value = pNext->get();
-
-            // If it's not the one we want to remove, bail out, it's already gone
-            if (value != _out) break;
-
-            // Move the head pointer, effectively removing the LockFreeNode
-            newHead.data.access = pHead.data.access + 1;
-            newHead.data.points_to.node = pNext;
-        } while (!head.compare_exchange_weak(pHead, newHead));
-
-        if (bSuccess)
-        {
-            assert(Atomic::decrement(debug.counter));
-        }
-    }
-
-    /// \return Returns true if the queue is empty
+    // Returns true if the queue is empty
     inline bool empty() const
     {
         return head.data.points_to.node->next.node == endNode.node;
     }
 
-    /// Remove all objects from the queue.
+    // Remove all objects from the queue.
     void clear()
     {
         Node* node = InternalRemove();
@@ -604,49 +405,56 @@ private:
         AtomicNodePointer pHead, pTail, newHead;
         Node *pNext;
         bool bSuccess = true;
+        bool skip = false;
 
         do {
+            skip = false;
+            //Save a local copy of pointers to update them locally
             pHead = head;
             pNext = pHead.data.points_to.node->next.node;
             pTail = tail;
 
+            //Early abort and retry if some other thread has already modified the head
             if (pHead.data.access.as_atomic != head.data.access.as_atomic)
             {
+                skip = true;
                 continue;
             }
 
+            //Abort if head points to the sentinelle
             if (pNext == endNode.node)
             {
-                // Removed as it's not completely true as the may have changed during reading the setup
-                // as we only check if the head changed not the tail
-                //GEAR_BLOCKING_ASSERT( pHead.data.m_node == pTail.data.m_node );
                 pHead.data.points_to.node = nullptr;
                 bSuccess = false;
                 break;
             }
 
-            // Check if the queue is empty.
+            //Early abort and retry if the queue is empty
             if (pHead.data.points_to.node == pTail.data.points_to.node)
             {
-                // Special case if the queue has nodes but the tail
-                // is just behind. Move the tail off of the head.
+                //Update tail for the next retry as it could have changed
                 UpdateTail(pTail);
+                skip = true;
                 continue;
             }
 
-            DEBUGONLY(if (!pNext) continue;)
-                value = pNext->load();
+            DEBUGONLY(if (!pNext) continue;);
+            //Save the value to be return if this try is successful
+            value = pNext->load();
 
-            // Move the head pointer, effectively removing the LockFreeNode
+            //Assemble a new head
             newHead.data.access.as_atomic = pHead.data.access.as_atomic + 1;
             newHead.data.points_to.node = pNext;
-        } while (!head.compare_exchange_weak(pHead, newHead));
+
+            //if the head we worked is the same as the current head, replace it with a new head
+        } while (skip || !head.compare_exchange_weak(pHead, newHead));
 
         if (bSuccess)
         {
             assert(Atomic::decrement(debug.counter));
         }
 
+        //If we succeeded then return the new value the removed node
         if (pHead.data.points_to.node != nullptr)
         {
             pHead.data.points_to.node->store(value);

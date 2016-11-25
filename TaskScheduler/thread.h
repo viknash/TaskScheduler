@@ -85,7 +85,7 @@ void BaseThread<MemInterface>::Init()
     pool.currentThread = this;
 
     //Signal Thread has started
-    --pool.setup.threadsNotStarted;
+    --pool.setup.threadSync;
     pool.setup.radio.notify_one();
 
     //Wakeup when all threads have started
@@ -97,7 +97,7 @@ template <class MemInterface>
 void BaseThread<MemInterface>::Sleep(bool (Thread::*wakeUp)())
 {
     unique_lock<mutex> signalLock(signal);
-    while (!(this->*wakeUp)())
+    while (!(this->*wakeUp)() && pool.setup.requestExit != ThreadPool::RequestStop)
     {
         radio.wait(signalLock);
     }
@@ -133,12 +133,11 @@ bool BaseThread<MemInterface>::IsTaskAvailable()
 template <class MemInterface>
 void BaseThread<MemInterface>::Run()
 {
-    auto exitRequested = false;
     ProfileTime scheduling(0ms), sleeping(0ms), working(0ms);
 
     cout << "Starting Thread " << uint32_t(threadIndex) << endl;
 
-    while (!exitRequested)
+    while (pool.setup.requestExit != ThreadPool::RequestStop)
     {
         //Steal Task
         Task* runTask = Instrument<Task*, Thread, Task*(Thread::*)()>(scheduling, this, &Thread::GetTask);
@@ -147,7 +146,9 @@ void BaseThread<MemInterface>::Run()
         {
             //Run Task
             ProfileTime taskTime(0ms);
+            ++pool.numWorking;
             Instrument<void, Task, void(Task::*)()>(taskTime, runTask, &Task::operator());
+            --pool.numWorking;
             cout << "Thread(" << uint32_t(threadIndex) << "), Task " << runTask->debug.taskName << "(" << chrono::duration_cast<chrono::milliseconds>(taskTime).count() << "ms)" << endl;
             working += taskTime;
 
@@ -159,10 +160,9 @@ void BaseThread<MemInterface>::Run()
             //Go to sleep if there is no task to run
             Instrument<void, Thread, void(Thread::*)( bool(Thread::*)() ) >(sleeping, this, &Thread::Sleep, &Thread::IsTaskAvailable);
         }
-
-        //Check if we need to exit thread
-        exitRequested = pool.setup.requestExit.load();
     };
+
+    assert(!IsTaskAvailable());
 
     auto schedulingMS = chrono::duration_cast<chrono::milliseconds>(scheduling);
     auto sleepingMS = chrono::duration_cast<chrono::milliseconds>(sleeping);

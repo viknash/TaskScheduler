@@ -8,6 +8,7 @@
 #include "thread.h"
 #include "threadpool.h"
 #include "profile.h"
+#include "utils.h"
 
 DefaultMemInterface gDefaultMemInterface;
 
@@ -46,7 +47,7 @@ void RandomTimeTask(chrono::milliseconds minTaskTime, chrono::milliseconds maxTa
 
     random_device rd;
     mt19937_64 gen(rd());
-    std::uniform_int_distribution<uint64_t> dis(minTaskTimeMs, maxTaskTimeMs);
+    uniform_int_distribution<uint64_t> dis(minTaskTimeMs, maxTaskTimeMs);
     uint64_t randomTime = dis(gen);
     chrono::microseconds randomTimeUS(randomTime);
 
@@ -62,13 +63,17 @@ int main()
     typedef BaseTaskGraph<DefaultMemInterface> TaskGraph;
     typedef BaseThreadPool<DefaultMemInterface> ThreadPool;
 
-    ThreadPool pool;
+    ThreadPool pool(128);
     TaskGraph taskGraph(pool);
     taskGraph.Load("tasks.txt");
 
+    random_device rd;
+    mt19937_64 gen(rd());
+    uniform_int_distribution<uint64_t> dis(0, 63);
     for (auto& task : taskGraph.debug.taskList)
     {
         task->persistent.runFunctor = bind(RandomTimeTask, 1ms, 16ms);
+        task->SetThreadAffinity(CreateMask64(dis(gen), dis(gen), dis(gen)));
     }
 
     pool.Start(taskGraph);

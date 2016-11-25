@@ -1,5 +1,6 @@
 #pragma once
 
+#include "meta.h"
 #include "profile.h"
 #include "containers.h"
 
@@ -20,20 +21,27 @@ class BaseThreadPool
 
 public:
 
+    enum State
+    {
+        Run = 0,
+        RequestPause,
+        RequestStop
+    };
+
     struct Setup
     {
         mutex signal;
         condition_variable radio;
-        atomic<uint32_t> threadsNotStarted;
-        atomic<bool> requestExit;
+        atomic<uint32_t> threadSync;
+        atomic<State> requestExit;
     };
 
 public:
 
-    BaseThreadPool();
+    BaseThreadPool(uint32_t _numThreads = MAX_NUM_THREADS);
     void Start(TaskGraph& taskGraph);
     void End();
-    void Wakeup();
+    void Wakeup(uint8_t numThreadsToWakeup = MAX_NUM_THREADS);
 
     static const uint32_t MAX_NUM_THREADS = 64;
 
@@ -42,6 +50,7 @@ public:
     TaskGraph*          taskGraph;
     Thread*             threads[MAX_NUM_THREADS];
     TaskMemoryAllocator taskMemoryAllocator;
+    atomic<uint32_t>    numWorking;
 
     optimization atomic<typename Task::Rank> queueRank[Task::NUM_PRIORITY][MAX_NUM_THREADS];
 
@@ -49,8 +58,8 @@ public:
 };
 
 template <class MemInterface>
-BaseThreadPool<MemInterface>::BaseThreadPool() :
-    numThreads(0),
+BaseThreadPool<MemInterface>::BaseThreadPool(uint32_t _numThreads) :
+    numThreads(min(min(thread::hardware_concurrency(), MAX_NUM_THREADS), _numThreads)),
     taskGraph(nullptr)
 {
     memset(threads, 0, sizeof(threads));
@@ -60,8 +69,7 @@ template <class MemInterface>
 void BaseThreadPool<MemInterface>::Start(TaskGraph& _taskGraph)
 {
     taskGraph = &_taskGraph;
-    numThreads = min(thread::hardware_concurrency(), MAX_NUM_THREADS);
-    setup.threadsNotStarted.store(uint32_t(numThreads));
+    setup.threadSync.store(uint32_t(numThreads));
 
     for (uint32_t threadIdx = 0; threadIdx < numThreads; threadIdx++)
     {
@@ -69,25 +77,21 @@ void BaseThreadPool<MemInterface>::Start(TaskGraph& _taskGraph)
     }
 
     //Wait until all threads are started
-    while (setup.threadsNotStarted != 0)
+    while (setup.threadSync != 0)
     {
         unique_lock<mutex> signal(setup.signal);
         setup.radio.wait(signal);
     }
 
     //Kick all sleeping threads
-    for (uint32_t threadIdx = 0; threadIdx < numThreads; threadIdx++)
-    {
-        threads[threadIdx]->Wakeup();
-    }
+    Wakeup();
 }
 
 template <class MemInterface>
 void BaseThreadPool<MemInterface>::End()
 {
-    setup.requestExit.store(true);
-
-    Wakeup();
+    setup.threadSync = (uint32_t) taskGraph->persistent.subGraphs.size();
+    setup.requestExit.store(RequestPause);
 
     for (uint32_t threadIdx = 0; threadIdx < numThreads; threadIdx++)
     {
@@ -103,10 +107,11 @@ void BaseThreadPool<MemInterface>::End()
 }
 
 template <class MemInterface>
-void BaseThreadPool<MemInterface>::Wakeup()
+void BaseThreadPool<MemInterface>::Wakeup(uint8_t numThreadsToWakeup)
 {
+    numThreadsToWakeup = min(numThreads, numThreadsToWakeup);
     reduce_starvation(always_different_thread_woken_up_first) static uint32_t nextThreadIndex = 0;
-    for (uint32_t threadIdx = nextThreadIndex, iterations = 0; iterations < numThreads; threadIdx = (threadIdx+1) % numThreads, iterations++ )
+    for (uint32_t threadIdx = nextThreadIndex, iterations = 0; iterations < numThreadsToWakeup; threadIdx = (threadIdx+1) % numThreads, iterations++ )
     {
         threads[threadIdx]->Wakeup();
     }

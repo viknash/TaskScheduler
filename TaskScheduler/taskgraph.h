@@ -74,6 +74,7 @@ public:
 
     void Initialize(SubGraph* subGraph = nullptr);
     void Load(String fileName);
+    void SetTaskThreadAffinity(Task* task, uint64_t mask);
     void SetupTailKickers();
     void DepthFirstVisitor(Task* task,
         function<void(Task*, void*&)> preOrderFunctor,
@@ -84,7 +85,7 @@ public:
         bool  bottomUp = false);
     void Kick();
 
-    void QueueTask(Task* task);
+    void QueueTask(Task* task, uint8_t numThreadsToWakeup = 1);
     Task* DequeueTask(uint32_t priority);
     bool IsTaskAvailable();
 
@@ -294,6 +295,36 @@ void BaseTaskGraph<MemInterface>::Load(String fileName)
         sort(task->persistent.dependentTasks.begin(), task->persistent.dependentTasks.end(), rank_sorter::compare);
     }
 
+    //Correct thread affinity masks of all tasks
+    for (auto headTask : persistent.headTasks)
+    {
+        void* param = nullptr;
+        DepthFirstVisitor(
+            headTask,
+            [&](Task* task, void*& param)
+        {
+            SetTaskThreadAffinity(task, task->persistent.threadAffinity);
+        },
+            nullptr,
+            nullptr,
+            nullptr,
+            param
+            );
+    }
+
+}
+
+template<class MemInterface>
+void BaseTaskGraph<MemInterface>::SetTaskThreadAffinity(Task* task, uint64_t mask)
+{
+    task->persistent.threadAffinity = 0;
+    uint64_t validThreadMask = 1ull << pool.numThreads;
+    validThreadMask = validThreadMask - 1;
+    while (mask)
+    {
+        task->persistent.threadAffinity |= mask & validThreadMask;
+        mask = mask >> pool.numThreads;
+    }
 }
 
 template<class MemInterface>
@@ -427,7 +458,7 @@ void BaseTaskGraph<MemInterface>::Kick()
 }
 
 template<class MemInterface>
-void BaseTaskGraph<MemInterface>::QueueTask(Task* task)
+void BaseTaskGraph<MemInterface>::QueueTask(Task* task, uint8_t numThreadsToWakeup)
 {
     bool result = false;
     uint32_t priority = task->persistent.taskPriority;
@@ -435,7 +466,7 @@ void BaseTaskGraph<MemInterface>::QueueTask(Task* task)
     } while (!transient.taskQueue[priority]->push_back(task) && ++priority < Task::NUM_PRIORITY);
     assert(priority < Task::NUM_PRIORITY);
 
-    pool.Wakeup();
+    pool.Wakeup(numThreadsToWakeup);
 }
 
 template<class MemInterface>
