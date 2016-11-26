@@ -40,16 +40,15 @@ should add to or customize.
 /////////////////////////////////////////////////////////////////////////////
 
 To Do
-1. Convert LockFreeNodes+Tasks to an Intrusive list
 2. Create one dispenser for all tasks
 4. Implement Thread Memory Allocators
 5. Implement Thread Memory Reclamation Lock Free List
 6. Run Thread Memory Reclamation before thread sleeps and periodically
-10. Implement Ranking for each task based on their the cumulative number of dependents
 12. Augment ranking with heuristics based on last execution time for a task
 13. Implement data parallel tasks
 14. Implement natvis for taskgraph, lockfree queue
-15. Exit pool only when all tail tasks from all the task graphs are complete. Don't kick new tasks from the tail
+16. http://www.codeproject.com/Tips/1055834/Cross-platform-Visual-Memory-Tracker
+17. parallel for
 
 To Test
 1. Test allocator alignment

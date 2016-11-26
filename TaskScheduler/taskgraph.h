@@ -75,6 +75,7 @@ public:
     void Initialize(SubGraph* subGraph = nullptr);
     void Load(String fileName);
     void SetTaskThreadAffinity(Task* task, uint64_t mask);
+    void SetTaskThreadExclusion(Task* task, uint64_t mask);
     void SetupTailKickers();
     void DepthFirstVisitor(Task* task,
         function<void(Task*, void*&)> preOrderFunctor,
@@ -325,6 +326,16 @@ void BaseTaskGraph<MemInterface>::SetTaskThreadAffinity(Task* task, uint64_t mas
         task->persistent.threadAffinity |= mask & validThreadMask;
         mask = mask >> pool.numThreads;
     }
+}
+
+template<class MemInterface>
+void BaseTaskGraph<MemInterface>::SetTaskThreadExclusion(Task* task, uint64_t mask)
+{
+    mask = ~mask;
+    uint64_t validThreadMask = 1ull << pool.numThreads;
+    validThreadMask = validThreadMask - 1;
+    mask = mask & validThreadMask;
+    SetTaskThreadAffinity(task, mask);
 }
 
 template<class MemInterface>

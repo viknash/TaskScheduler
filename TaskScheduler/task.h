@@ -33,18 +33,7 @@ public:
 
     struct Debug
     {
-        const char* PriorityToString(Priority priority) const
-        {
-            static const char* PriorityToString[] =
-            {
-                "REALTIME",
-                "HIGH",
-                "NORMAL",
-                "LOW"
-            };
-
-            return PriorityToString[uint32_t(priority)];
-        }
+        const char* PriorityToString(Priority priority) const;
 
         String taskName;
         StringVector dependentTaskNames;
@@ -57,11 +46,7 @@ public:
 
     struct Persistent
     {
-        Persistent() :
-            taskPriority(NORMAL),
-            subGraph(nullptr),
-            rank(0)
-        {}
+        Persistent();
 
         Priority taskPriority;
         TaskVector parentTasks;
@@ -74,6 +59,7 @@ public:
     };
 
     void SetThreadAffinity(uint64_t mask);
+    void SetThreadExclusion(uint64_t mask);
     BaseTask(TaskGraph& _taskGraph);
     void KickDependentTasks();
     void operator()();
@@ -85,6 +71,28 @@ public:
 };
 
 template <class MemInterface>
+const char* BaseTask<MemInterface>::Debug::PriorityToString(Priority priority) const
+{
+    static const char* PriorityToString[] =
+    {
+        "REALTIME",
+        "HIGH",
+        "NORMAL",
+        "LOW"
+    };
+
+    return PriorityToString[uint32_t(priority)];
+}
+
+template <class MemInterface>
+BaseTask<MemInterface>::Persistent::Persistent() :
+    taskPriority(NORMAL),
+    subGraph(nullptr),
+    rank(0),
+    threadAffinity(0)
+{}
+
+template <class MemInterface>
 void BaseTask<MemInterface>::operator()()
 {
     persistent.runFunctor();
@@ -94,6 +102,12 @@ template <class MemInterface>
 void BaseTask<MemInterface>::SetThreadAffinity(uint64_t mask)
 {
     taskGraph.SetTaskThreadAffinity(this, mask);
+}
+
+template <class MemInterface>
+void BaseTask<MemInterface>::SetThreadExclusion(uint64_t mask)
+{
+    taskGraph.SetTaskThreadExclusion(this, mask);
 }
 
 template <class MemInterface>
@@ -155,6 +169,8 @@ void BaseTask<MemInterface>::KickDependentTasks()
         }
     }
 
+    //Stop kicking tasks when a request to pause has been received
+    //If all tail kickers have paused, then request the threads to stop
     if (persistent.kickTasks.size() && taskGraph.pool.setup.requestExit == ThreadPool::RequestPause)
     {
         --taskGraph.pool.setup.threadSync;
