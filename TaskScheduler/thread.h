@@ -84,7 +84,7 @@ void BaseThread<MemInterface>::Init()
     threadId = this_thread::get_id();
     pool.currentThread = this;
 
-    //Signal Thread has started
+    // Signal Thread has started
     --pool.setup.threadSync;
     pool.setup.radio.notify_one();
 

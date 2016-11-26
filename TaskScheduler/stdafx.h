@@ -6,29 +6,29 @@
 #pragma once
 
 #include "targetver.h"
-#include <stdio.h>
-#include <tchar.h>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-#include <cstdio>
-#include <thread>
-#include <vector>
-#include <string>
-#include <cctype>
 #include <algorithm>
-#include <unordered_map>
-#include <cstdint>
+#include <atomic>
 #include <cassert>
+#include <cctype>
+#include <condition_variable>
+#include <cstdint>
+#include <cstdio>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <iterator>
+#include <memory>
+#include <new>
 #include <random>
 #include <set>
-#include <iterator>
-#include <iomanip>
-#include <atomic>
-#include <condition_variable>
-#include <memory>
+#include <sstream>
+#include <stdio.h>
+#include <string>
+#include <tchar.h>
+#include <thread>
 #include <typeinfo>
-#include <new>
+#include <unordered_map>
+#include <vector>
 
 #define NOMINMAX
 #include <windows.h>
@@ -36,6 +36,5 @@
 using namespace std;
 using namespace std::chrono_literals;
 using namespace std::placeholders;
-
 
 // TODO: reference additional headers your program requires here

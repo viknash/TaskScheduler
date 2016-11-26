@@ -1,66 +1,63 @@
 #pragma once
 
-#include "utils.h"
 #include "memory.h"
+#include "utils.h"
 
-namespace Atomic
+namespace Atomic {
+inline int64_t increment(volatile int64_t& data)
 {
-    inline int64_t increment(volatile int64_t& data)
-    {
-        return _InterlockedIncrement64(&data);
-    }
+    return _InterlockedIncrement64(&data);
+}
 
-    inline int64_t decrement(volatile int64_t& data)
-    {
-        return _InterlockedDecrement64(&data);
-    }
+inline int64_t decrement(volatile int64_t& data)
+{
+    return _InterlockedDecrement64(&data);
+}
 
-    inline int32_t increment(volatile int32_t& data)
-    {
-        return _InterlockedIncrement((volatile long*)&data);
-    }
+inline int32_t increment(volatile int32_t& data)
+{
+    return _InterlockedIncrement((volatile long*)&data);
+}
 
-    inline int32_t decrement(volatile int32_t& data)
-    {
-        return _InterlockedDecrement((volatile long*)&data);
-    }
+inline int32_t decrement(volatile int32_t& data)
+{
+    return _InterlockedDecrement((volatile long*)&data);
+}
 
-    inline int32_t compare_exchange_weak(volatile int32_t& data, int32_t comperand, int32_t value)
-    {
-        return _InterlockedCompareExchange((volatile long*)&data, (long)value, (long)comperand);
-    }
+inline int32_t compare_exchange_weak(volatile int32_t& data, int32_t comperand, int32_t value)
+{
+    return _InterlockedCompareExchange((volatile long*)&data, (long)value, (long)comperand);
+}
 
-    inline int64_t compare_exchange_weak(volatile int64_t& data, int64_t comperand, int64_t value)
-    {
-        return _InterlockedCompareExchange64(&data, value, comperand);
-    }
+inline int64_t compare_exchange_weak(volatile int64_t& data, int64_t comperand, int64_t value)
+{
+    return _InterlockedCompareExchange64(&data, value, comperand);
+}
 
-    template <class T>
-    inline T* compare_exchange_weak(T* volatile& data, T* comperand, T* value)
-    {
-        return reinterpret_cast<T*>(_InterlockedCompareExchangePointer((void * volatile *)&data, (void *)value, (void *)comperand));
-    }
+template <class T>
+inline T* compare_exchange_weak(T* volatile& data, T* comperand, T* value)
+{
+    return reinterpret_cast<T*>(_InterlockedCompareExchangePointer((void* volatile*)&data, (void*)value, (void*)comperand));
+}
 
-    inline bool compare_exchange_weak_128(volatile int64_t data[], int64_t comperand[], int64_t valueHi, int64_t valueLo)
-    {
-        return _InterlockedCompareExchange128(data, valueHi, valueLo, comperand) == 1;
-    }
+inline bool compare_exchange_weak_128(volatile int64_t data[], int64_t comperand[], int64_t valueHi, int64_t valueLo)
+{
+    return _InterlockedCompareExchange128(data, valueHi, valueLo, comperand) == 1;
+}
 
-    typedef int64_t Type;
+typedef int64_t Type;
 };
 
-union Address
-{
+union Address {
     volatile void* pointer;
     Atomic::Type as_atomic;
 };
 
-template<typename T, class MemInterface>
+template <typename T, class MemInterface>
 struct LockFreeNode;
 
-template<typename T, class MemInterface>
-struct AtomicLockFreeNode : public MemInterface
-{
+template <typename T, class MemInterface>
+struct AtomicLockFreeNode : public MemInterface {
     typedef LockFreeNode<T, MemInterface> Node;
     union {
         Node* volatile node;
@@ -69,9 +66,8 @@ struct AtomicLockFreeNode : public MemInterface
 };
 static_assert(sizeof(AtomicLockFreeNode<void*, DefaultMemInterface>) == sizeof(Address), "Size of AtomicLockFreeNode is incorrect.");
 
-template<typename T, class MemInterface>
-struct class_alignment LockFreeNode : public MemInterface
-{
+template <typename T, class MemInterface>
+struct class_alignment LockFreeNode : public MemInterface {
     typedef AtomicLockFreeNode<T, MemInterface> AtomicNode;
 
     explicit operator void*() const { return reinterpret_cast<void*>(this); }
@@ -87,13 +83,11 @@ struct class_alignment LockFreeNode : public MemInterface
 };
 static_assert(sizeof(LockFreeNode<void*, DefaultMemInterface>) == sizeof(Address) * 2, "Size of AtomicLockFreeNode is incorrect.");
 
-template<typename T, class MemInterface>
-struct class_alignment AtomicLockFreeNodePointer : public MemInterface
-{
+template <typename T, class MemInterface>
+struct class_alignment AtomicLockFreeNodePointer : public MemInterface {
     typedef AtomicLockFreeNode<T, MemInterface> AtomicNode;
 
-    union Data
-    {
+    union Data {
         struct
         {
             AtomicNode points_to;
@@ -108,26 +102,23 @@ struct class_alignment AtomicLockFreeNodePointer : public MemInterface
         data.points_to.node = nullptr;
     }
 
-    inline bool compare_exchange_weak(AtomicLockFreeNodePointer & comperand, AtomicLockFreeNodePointer & value) volatile
+    inline bool compare_exchange_weak(AtomicLockFreeNodePointer& comperand, AtomicLockFreeNodePointer& value) volatile
     {
         return Atomic::compare_exchange_weak_128(data.as_atomic, comperand.data.as_atomic, value.data.access.as_atomic, value.data.points_to.as_atomic);
     }
 
-    void operator=(const volatile AtomicLockFreeNodePointer &other)
+    void operator=(const volatile AtomicLockFreeNodePointer& other)
     {
         data.access.as_atomic = other.data.access.as_atomic;
         data.points_to.node = other.data.points_to.node;
     }
 
     Data data;
-
 };
 static_assert(sizeof(AtomicLockFreeNodePointer<bool, DefaultMemInterface>) == sizeof(Address) * 2, "Size of AtomicLockFreeNodePointer is incorrect.");
 
-
-template<typename T, class MemInterface>
-class LockFreeNodeStack : public MemInterface
-{
+template <typename T, class MemInterface>
+class LockFreeNodeStack : public MemInterface {
     typedef LockFreeNode<T, MemInterface> Node;
     typedef AtomicLockFreeNodePointer<T, MemInterface> AtomicNodePointer;
 
@@ -142,8 +133,7 @@ public:
     {
         DEBUGONLY(assert(_node->next.node == nullptr););
         AtomicNodePointer copy, newNode;
-        do
-        {
+        do {
             copy = head;
             newNode.data.access.as_atomic = copy.data.access.as_atomic + 1;
             newNode.data.points_to.node = _node;
@@ -155,11 +145,9 @@ public:
     Node* pop_front()
     {
         AtomicNodePointer copy, incCopy;
-        do
-        {
+        do {
             copy = head;
-            if (copy.data.points_to.node == nullptr)
-            {
+            if (copy.data.points_to.node == nullptr) {
                 return nullptr;
             }
 
@@ -181,30 +169,25 @@ public:
 private:
     AtomicNodePointer head;
 
-    struct Debug
-    {
+    struct Debug {
         int32_t counter;
     };
     DEBUGONLY(Debug debug;);
 };
 
-template<typename T, class MemInterface = DefaultMemInterface>
-class LockFreeNodeDispenser : public MemInterface
-{
+template <typename T, class MemInterface = DefaultMemInterface>
+class LockFreeNodeDispenser : public MemInterface {
     typedef LockFreeNode<T, MemInterface> Node;
     typedef LockFreeNodeStack<T, MemInterface> NodeStack;
     typedef vector<Node, Allocator<T, MemInterface>> NodeVector;
 
 public:
-
     LockFreeNodeDispenser(uint32_t _startCount = 0)
     {
-        if (_startCount)
-        {
+        if (_startCount) {
             // Array requested
             array.reserve(_startCount);
-            while (_startCount--)
-            {
+            while (_startCount--) {
                 dispenser.push_front(&array[_startCount]);
             }
         }
@@ -212,12 +195,10 @@ public:
 
     ~LockFreeNodeDispenser()
     {
-        if (!array.size())
-        {
+        if (!array.size()) {
             LockFreeNode<T, MemInterface>* node = dispenser.pop_front();
-            while (node)
-            {
-                delete(node);
+            while (node) {
+                delete (node);
                 node = dispenser.pop_front();
             }
         }
@@ -228,14 +209,10 @@ public:
     inline Node* NewNode()
     {
         Node* ret = dispenser.pop_front();
-        if (ret == nullptr)
-        {
-            if (!array.size())
-            {
+        if (ret == nullptr) {
+            if (!array.size()) {
                 ret = new Node();
-            }
-            else
-            {
+            } else {
                 cout << "Insufficient number of pre-allocated Nodes" << endl;
             }
         }
@@ -259,16 +236,15 @@ private:
 // Elements are contained into single-chained nodes provided by a LockFreeNodeDispenser.
 // param T Name of the type of object in the container
 
-template<typename T, class MemInterface, class Dispenser>
-class MultiProducerMultiConsumer
-{
+template <typename T, class MemInterface, class Dispenser>
+class MultiProducerMultiConsumer {
     typedef LockFreeNode<T, MemInterface> Node;
     typedef AtomicLockFreeNode<T, MemInterface> AtomicNode;
     typedef AtomicLockFreeNodePointer<T, MemInterface> AtomicNodePointer;
-public:
 
-    MultiProducerMultiConsumer(Dispenser* _dispenser = 0) :
-        dispenser(_dispenser)
+public:
+    MultiProducerMultiConsumer(Dispenser* _dispenser = 0)
+        : dispenser(_dispenser)
     {
         endNode.node = (Node*)(this); //Magic Value for the end node
         DEBUGONLY(debug.counter = 1);
@@ -303,8 +279,7 @@ public:
         AtomicNodePointer tailSnapshot;
         tailSnapshot = tail;
         DEBUGONLY(Atomic::increment(debug.counter););
-        while (endNode.as_atomic != Atomic::compare_exchange_weak(tail.data.points_to.node->next.as_atomic, endNode.as_atomic, newNode.as_atomic))
-        {
+        while (endNode.as_atomic != Atomic::compare_exchange_weak(tail.data.points_to.node->next.as_atomic, endNode.as_atomic, newNode.as_atomic)) {
             DEBUGONLY(Atomic::decrement(debug.counter););
             UpdateTail(tailSnapshot);
             tailSnapshot = tail;
@@ -324,24 +299,21 @@ public:
     {
         T value = T();
         AtomicNodePointer headSnapshot;
-        Node * nextSnapshot;
+        Node* nextSnapshot;
         bool ret = true;
         bool skip = false;
 
-        do
-        {
+        do {
             skip = false;
             headSnapshot = head;
             nextSnapshot = headSnapshot.data.points_to.node->next;
 
-            if (headSnapshot.data.access != head.data.access)
-            {
+            if (headSnapshot.data.access != head.data.access) {
                 skip = true;
                 continue;
             }
 
-            if (nextSnapshot == endNode.node)
-            {
+            if (nextSnapshot == endNode.node) {
                 _out = T();
                 ret = false;
                 break;
@@ -379,22 +351,19 @@ public:
     void clear()
     {
         Node* node = InternalRemove();
-        while (node)
-        {
+        while (node) {
             dispenser->FreeNode(node);
             node = InternalRemove();
         }
     }
 
 private:
-
     inline void UpdateTail(AtomicNodePointer& _tail)
     {
         AtomicNodePointer newTail;
         newTail.data.access.as_atomic = _tail.data.access.as_atomic + 1;
         newTail.data.points_to.node = _tail.data.points_to.node->next.node;
-        if (newTail.data.points_to.node != endNode.node)
-        {
+        if (newTail.data.points_to.node != endNode.node) {
             tail.compare_exchange_weak(_tail, newTail);
         }
     }
@@ -403,7 +372,7 @@ private:
     {
         T value = T();
         AtomicNodePointer pHead, pTail, newHead;
-        Node *pNext;
+        Node* pNext;
         bool bSuccess = true;
         bool skip = false;
 
@@ -415,23 +384,20 @@ private:
             pTail = tail;
 
             //Early abort and retry if some other thread has already modified the head
-            if (pHead.data.access.as_atomic != head.data.access.as_atomic)
-            {
+            if (pHead.data.access.as_atomic != head.data.access.as_atomic) {
                 skip = true;
                 continue;
             }
 
             //Abort if head points to the sentinelle
-            if (pNext == endNode.node)
-            {
+            if (pNext == endNode.node) {
                 pHead.data.points_to.node = nullptr;
                 bSuccess = false;
                 break;
             }
 
             //Early abort and retry if the queue is empty
-            if (pHead.data.points_to.node == pTail.data.points_to.node)
-            {
+            if (pHead.data.points_to.node == pTail.data.points_to.node) {
                 //Update tail for the next retry as it could have changed
                 UpdateTail(pTail);
                 skip = true;
@@ -449,14 +415,12 @@ private:
             //if the head we worked is the same as the current head, replace it with a new head
         } while (skip || !head.compare_exchange_weak(pHead, newHead));
 
-        if (bSuccess)
-        {
+        if (bSuccess) {
             assert(Atomic::decrement(debug.counter));
         }
 
         //If we succeeded then return the new value the removed node
-        if (pHead.data.points_to.node != nullptr)
-        {
+        if (pHead.data.points_to.node != nullptr) {
             pHead.data.points_to.node->store(value);
             DEBUGONLY(pHead.data.points_to.node->next.node = nullptr;);
         }
@@ -467,28 +431,24 @@ private:
 private:
     AtomicNodePointer volatile head;
     AtomicNodePointer volatile tail;
-    AtomicNode  endNode;
-    Dispenser *dispenser;
-    struct Debug
-    {
+    AtomicNode endNode;
+    Dispenser* dispenser;
+    struct Debug {
         volatile int32_t counter;
     };
     DEBUGONLY(Debug debug;);
 };
 
-template<class Policy, class T, class MemInterface, class Param = void*>
-class LockFreeQueue : public MemInterface
-{
+template <class Policy, class T, class MemInterface, class Param = void*>
+class LockFreeQueue : public MemInterface {
 public:
     LockFreeQueue()
     {
-
     }
 
-    LockFreeQueue(Param param) :
-        queue(param)
+    LockFreeQueue(Param param)
+        : queue(param)
     {
-
     }
 
     bool push_back(T newData)

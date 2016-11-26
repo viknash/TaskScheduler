@@ -1,15 +1,19 @@
 #pragma once
 
 #include "meta.h"
-
-template <class MemInterface> class BaseTaskGraph;
-template <class MemInterface> class BaseThreadPool;
-template <class MemInterface> struct BaseThread;
-template<class Task, class MemInterface> struct BaseSubGraph;
+#include "memory.h"
 
 template <class MemInterface>
-class BaseTask : public MemInterface
-{
+class BaseTaskGraph;
+template <class MemInterface>
+class BaseThreadPool;
+template <class MemInterface>
+struct BaseThread;
+template <class Task, class MemInterface>
+struct BaseSubGraph;
+
+template <class MemInterface>
+class BaseTask : public MemInterface {
 public:
     typedef BaseTask<MemInterface> Task;
     typedef BaseThread<MemInterface> Thread;
@@ -19,11 +23,10 @@ public:
     typedef vector<String, Allocator<String, MemInterface>> StringVector;
     typedef vector<Task*, Allocator<Task*, MemInterface>> TaskVector;
     typedef BaseThreadPool<MemInterface> ThreadPool;
-    typedef function <void()> Function;
+    typedef function<void()> Function;
     typedef typename int64_t Rank;
 
-    enum Priority
-    {
+    enum Priority {
         REALTIME,
         HIGH,
         NORMAL,
@@ -31,21 +34,18 @@ public:
         NUM_PRIORITY
     };
 
-    struct Debug
-    {
+    struct Debug {
         const char* PriorityToString(Priority priority) const;
 
         String taskName;
         StringVector dependentTaskNames;
     };
 
-    struct Transient
-    {
-        atomic_int64_t  startGate;
+    struct Transient {
+        atomic_int64_t startGate;
     };
 
-    struct Persistent
-    {
+    struct Persistent {
         Persistent();
 
         Priority taskPriority;
@@ -73,8 +73,7 @@ public:
 template <class MemInterface>
 const char* BaseTask<MemInterface>::Debug::PriorityToString(Priority priority) const
 {
-    static const char* PriorityToString[] =
-    {
+    static const char* PriorityToString[] = {
         "REALTIME",
         "HIGH",
         "NORMAL",
@@ -85,12 +84,13 @@ const char* BaseTask<MemInterface>::Debug::PriorityToString(Priority priority) c
 }
 
 template <class MemInterface>
-BaseTask<MemInterface>::Persistent::Persistent() :
-    taskPriority(NORMAL),
-    subGraph(nullptr),
-    rank(0),
-    threadAffinity(0)
-{}
+BaseTask<MemInterface>::Persistent::Persistent()
+    : taskPriority(NORMAL)
+    , subGraph(nullptr)
+    , rank(0)
+    , threadAffinity(0)
+{
+}
 
 template <class MemInterface>
 void BaseTask<MemInterface>::operator()()
@@ -111,10 +111,9 @@ void BaseTask<MemInterface>::SetThreadExclusion(uint64_t mask)
 }
 
 template <class MemInterface>
-BaseTask<MemInterface>::BaseTask(TaskGraph& _taskGraph) :
-    taskGraph(_taskGraph)
+BaseTask<MemInterface>::BaseTask(TaskGraph& _taskGraph)
+    : taskGraph(_taskGraph)
 {
-
 }
 
 template <class MemInterface>
@@ -130,10 +129,8 @@ void BaseTask<MemInterface>::KickDependentTasks()
     //If we are scheduling many tasks at once search for the next best ranked queue, starting from just after the queue that was just scheduled
     reduce_starvation(new_search_index) uint32_t bestSearchIndex = taskGraph.pool.currentThread->threadIndex;
 
-    for (auto dependentTask : persistent.dependentTasks)
-    {
-        if (--dependentTask->transient.startGate == 0)
-        {
+    for (auto dependentTask : persistent.dependentTasks) {
+        if (--dependentTask->transient.startGate == 0) {
             //Find lowest ranking queue, aka best queue and increment its rank with dependent task rank
             uint32_t currentThreadIndex = 0;
             Thread* bestThread = nullptr;
@@ -142,14 +139,12 @@ void BaseTask<MemInterface>::KickDependentTasks()
                 bestThread = nullptr;
                 bestRank = numeric_limits<Rank>::max();
                 reduce_starvation(new_search_index) currentThreadIndex = bestSearchIndex;
-                while ((currentThreadIndex = (currentThreadIndex + 1) % taskGraph.pool.numThreads) != bestSearchIndex)
-                {
+                while ((currentThreadIndex = (currentThreadIndex + 1) % taskGraph.pool.numThreads) != bestSearchIndex) {
                     if (!(dependentTask->persistent.threadAffinity & 1ull << currentThreadIndex))
-                        continue; //Skip threads the task should not run on 
+                        continue; //Skip threads the task should not run on
 
                     int64_t currentThreadRank = taskGraph.pool.queueRank[dependentTask->persistent.taskPriority][currentThreadIndex].load();
-                    if (currentThreadRank < bestRank)
-                    {
+                    if (currentThreadRank < bestRank) {
                         bestRank = currentThreadRank;
                         bestThread = taskGraph.pool.threads[currentThreadIndex];
                     }
@@ -171,11 +166,9 @@ void BaseTask<MemInterface>::KickDependentTasks()
 
     //Stop kicking tasks when a request to pause has been received
     //If all tail kickers have paused, then request the threads to stop
-    if (persistent.kickTasks.size() && taskGraph.pool.setup.requestExit == ThreadPool::RequestPause)
-    {
+    if (persistent.kickTasks.size() && taskGraph.pool.setup.requestExit == ThreadPool::RequestPause) {
         --taskGraph.pool.setup.threadSync;
-        if (!taskGraph.pool.setup.threadSync)
-        {
+        if (!taskGraph.pool.setup.threadSync) {
             taskGraph.pool.setup.requestExit.store(ThreadPool::RequestStop);
             taskGraph.pool.Wakeup();
         }
@@ -185,10 +178,8 @@ void BaseTask<MemInterface>::KickDependentTasks()
     //Only Tail Task Nodes should have kick tasks
     //Kick tasks are Head Tasks for the next frame
     bool initializedSubGraph = false;
-    for (auto kickTask : persistent.kickTasks)
-    {
-        if (!initializedSubGraph)
-        {
+    for (auto kickTask : persistent.kickTasks) {
+        if (!initializedSubGraph) {
             taskGraph.Initialize(kickTask->persistent.subGraph);
             initializedSubGraph = true;
         }
