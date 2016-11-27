@@ -1,108 +1,115 @@
 #pragma once
 
+#include <cassert>
+#include <memory>
+
 #define ALIGNMENT 16
 
 #pragma pack(ALIGNMENT)
 #define class_alignment alignas(ALIGNMENT)
 
-template <class T, class MemInterface>
-class Allocator : public MemInterface {
-public:
-    //    typedefs
-    typedef T value_type;
-    typedef value_type* pointer;
-    typedef const value_type* const_pointer;
-    typedef value_type& reference;
-    typedef const value_type& const_reference;
-    typedef size_t size_type;
-    typedef ptrdiff_t difference_type;
+namespace task_scheduler {
 
-public:
-    //    convert an allocator<T> to allocator<U>
+    template <class T, class TMemInterface>
+    class stl_allocator : public TMemInterface {
+    public:
+        //    typedefs
+        typedef T value_type;
+        typedef value_type* pointer;
+        typedef const value_type* const_pointer;
+        typedef value_type& reference;
+        typedef const value_type& const_reference;
+        typedef size_t size_type;
+        typedef ptrdiff_t difference_type;
 
-    template <typename U, class MemInterface>
-    struct rebind {
-        typedef Allocator<U, MemInterface> other;
+    public:
+        //    convert an allocator<T> to allocator<U>
+
+        template <typename U, class TMemInterface>
+        struct rebind {
+            typedef stl_allocator<U, TMemInterface> other;
+        };
+
+    public:
+        inline stl_allocator() {}
+        inline ~stl_allocator() {}
+        inline stl_allocator(stl_allocator const&) {}
+        template <typename U>
+        inline stl_allocator(stl_allocator<U, TMemInterface> const&) {}
+
+        inline pointer address(reference r) { return &r; }
+        inline const_pointer address(const_reference r) { return &r; }
+
+        inline pointer allocate(size_type _cnt,
+            typename std::allocator<void>::const_pointer = 0)
+        {
+            // std::cout << "Trying to allocate " << cnt << " objects in memory" << std::endl;
+            pointer new_memory = reinterpret_cast<pointer>(operator new(_cnt * sizeof(T)));
+            // std::cout << "Allocated " << cnt << " objects in memory at location:" <<
+            // new_memory << std::endl;
+            return new_memory;
+        }
+
+        inline void deallocate(pointer _p, size_type _n)
+        {
+            operator delete(_p, _n * sizeof(T));
+            // std::cout << "Deleted " << n << " objects from memory" << std::endl;
+        }
+
+        inline size_type max_size() const
+        {
+            return std::numeric_limits<size_type>::max() / sizeof(T);
+        }
+
+        inline bool operator==(stl_allocator const&) const { return true; }
+
+        inline bool operator!=(stl_allocator const& _a) { return !operator==(_a); }
     };
 
-public:
-    inline Allocator() {}
-    inline ~Allocator() {}
-    inline Allocator(Allocator const&) {}
-    template <typename U>
-    inline Allocator(Allocator<U, MemInterface> const&) {}
+    class default_mem_interface {
+        struct metadata_type {
+            size_t space;
+        };
 
-    inline pointer address(reference r) { return &r; }
-    inline const_pointer address(const_reference r) { return &r; }
+    public:
+        // Use global new/delete
+        void* default_mem_interface::operator new(size_t _size)
+        {
+            // std::cout << "custom new for size " << size << '\n';
+            size_t alignment = ALIGNMENT;
+            metadata_type metadata = { 0 };
+            metadata.space = _size + sizeof(metadata_type) + alignment;
+            void* raw_pointer = malloc(metadata.space);
+            assert(raw_pointer);
+            void* aligned_pointer = std::align(alignment, _size + sizeof(metadata_type), raw_pointer, metadata.space);
+            assert(aligned_pointer);
+            *(metadata_type*)((char*)aligned_pointer + _size) = metadata;
+            return aligned_pointer;
+        }
 
-    inline pointer allocate(size_type cnt,
-        typename allocator<void>::const_pointer = 0)
-    {
-        // cout << "Trying to allocate " << cnt << " objects in memory" << endl;
-        pointer new_memory = reinterpret_cast<pointer>(operator new(cnt * sizeof(T)));
-        // cout << "Allocated " << cnt << " objects in memory at location:" <<
-        // new_memory << endl;
-        return new_memory;
-    }
+        void* default_mem_interface::operator new[](size_t _counter)
+        {
+            // std::cout << "custom new for size " << counter << '\n';
+            return operator new(_counter);
+        }
 
-    inline void deallocate(pointer p, size_type n)
-    {
-        operator delete(p, n * sizeof(T));
-        // cout << "Deleted " << n << " objects from memory" << endl;
-    }
+            void operator delete(void* _ptr, size_t _size)
+        {
+            // std::cout << "custom delete for size " << size << '\n';
+            size_t alignment = ALIGNMENT;
+            void* aligned_pointer = _ptr;
+            metadata_type* metadata = (metadata_type*)((char*)aligned_pointer + _size);
+            void* raw_pointer = (void*)((char*)aligned_pointer - (_size + sizeof(metadata_type) + alignment - metadata->space));
+            free(raw_pointer);
+        }
 
-    inline size_type max_size() const
-    {
-        return numeric_limits<size_type>::max() / sizeof(T);
-    }
-
-    inline bool operator==(Allocator const&) const { return true; }
-
-    inline bool operator!=(Allocator const& a) { return !operator==(a); }
-};
-
-class DefaultMemInterface {
-    struct Metadata {
-        size_t space;
+        void operator delete[](void* _ptr, size_t _counter)
+        {
+            // std::cout << "custom delete for size " << counter << '\n';
+            operator delete(_ptr, _counter);
+        }
     };
 
-public:
-    // Use global new/delete
-    void* DefaultMemInterface::operator new(size_t size)
-    {
-        // cout << "custom new for size " << size << '\n';
-        size_t alignment = ALIGNMENT;
-        Metadata metadata = { 0 };
-        metadata.space = size + sizeof(Metadata) + alignment;
-        void* raw_pointer = malloc(metadata.space);
-        assert(raw_pointer);
-        void* aligned_pointer = align(alignment, size + sizeof(Metadata), raw_pointer, metadata.space);
-        assert(aligned_pointer);
-        *(Metadata*)((char*)aligned_pointer + size) = metadata;
-        return aligned_pointer;
-    }
+    static_assert(sizeof(default_mem_interface) == 1, "Not an empty base class");
 
-    void* DefaultMemInterface::operator new[](size_t counter)
-    {
-        // cout << "custom new for size " << counter << '\n';
-        return operator new(counter);
-    }
-
-    void operator delete(void* ptr, size_t size)
-    {
-        // cout << "custom delete for size " << size << '\n';
-        size_t alignment = ALIGNMENT;
-        void* aligned_pointer = ptr;
-        Metadata* metadata = (Metadata*)((char*)aligned_pointer + size);
-        void* raw_pointer = (void*)((char*)aligned_pointer - (size + sizeof(Metadata) + alignment - metadata->space));
-        free(raw_pointer);
-    }
-
-    void operator delete[](void* ptr, size_t counter)
-    {
-        // cout << "custom delete for size " << counter << '\n';
-        operator delete(ptr, counter);
-    }
 };
-
-static_assert(sizeof(DefaultMemInterface) == 1, "Not an empty base class");

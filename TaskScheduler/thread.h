@@ -1,195 +1,202 @@
 #pragma once
 
+#include <condition_variable>
+#include <iomanip>
+
 #include "profile.h"
 #include "containers.h"
 
-template <class MemInterface> class BaseTask;
-template <class MemInterface> class BaseTaskGraph;
-template <class MemInterface> class BaseThreadPool;
+namespace task_scheduler {
 
-template <class MemInterface>
-struct BaseThread : public MemInterface
-{
-    typedef typename BaseTaskGraph<MemInterface> TaskGraph;
-    typedef typename TaskGraph::Task Task;
-    typedef typename TaskGraph::TaskQueue TaskQueue;
-    typedef typename BaseThread<MemInterface> Thread;
-    typedef typename BaseThreadPool<MemInterface> ThreadPool;
-    typedef typename TaskGraph::TaskMemoryAllocator TaskMemoryAllocator;
+    template <class TMemInterface> class base_task;
+    template <class TMemInterface> class base_task_graph;
+    template <class TMemInterface> class base_thread_pool;
 
-    BaseThread(uint8_t _threadIndex, ThreadPool* _pool);
-    ~BaseThread();
-
-    static Thread* CreateThread(ThreadPool* pool);
-
-    void Sleep(bool(Thread::*wakeUp)());
-    void Wakeup();
-    void Join();
-
-    TaskQueue*  taskQueue[Task::NUM_PRIORITY];
-    uint8_t     threadIndex;
-    thread::id  threadId;
-    thread      taskThread;
-    TaskMemoryAllocator allocator;
-
-    friend class thread;
-
-private:
-    void Init();
-    void Run();
-    bool IsTaskAvailable();
-    Task* GetTask();
-
-    ThreadPool& pool;
-    mutex signal;
-    condition_variable radio;
-};
-
-template <class MemInterface>
-BaseThread<MemInterface>::BaseThread(uint8_t _threadIndex, ThreadPool* _pool) :
-    threadIndex(_threadIndex),
-    pool(*_pool)
-{
-    for (auto& queue : taskQueue)
+    template <class TMemInterface>
+    struct base_thread : public TMemInterface
     {
-        queue = new TaskQueue(&allocator);
-    }
+        typedef typename base_task_graph<TMemInterface> task_graph_type;
+        typedef typename task_graph_type::task_type task_type;
+        typedef typename task_graph_type::task_queue_type task_queue_type;
+        typedef typename base_thread<TMemInterface> thread_type;
+        typedef typename base_thread_pool<TMemInterface> thread_pool;
+        typedef typename task_graph_type::task_memory_allocator_type task_memory_allocator_type;
 
-    taskThread = thread([&] {
-        Init();
-        Run();
-    });
-}
+        base_thread(uint8_t _thread_index, thread_pool* _pool);
+        ~base_thread();
 
-template <class MemInterface>
-BaseThread<MemInterface>::~BaseThread()
-{
-    for (auto& queue : taskQueue)
-    {
-        delete queue;
-        queue = nullptr;
-    }
-}
+        static thread_type* create_thread(thread_pool* _pool);
 
-template <class MemInterface>
-BaseThread<MemInterface>* BaseThread<MemInterface>::CreateThread(ThreadPool* pool)
-{
-    static uint32_t nextThreadNum = 0;
-    return new Thread(nextThreadNum++, pool);
-}
+        void sleep(bool(thread_type::*_wake_up)());
+        void wake_up();
+        void join();
 
-template <class MemInterface>
-void BaseThread<MemInterface>::Init()
-{
-    threadId = this_thread::get_id();
-    pool.currentThread = this;
+        task_queue_type*  task_queue[task_type::NUM_PRIORITY];
+        uint8_t     thread_index;
+        std::thread::id  thread_id;
+        std::thread      task_thread;
+        task_memory_allocator_type allocator;
 
-    // Signal Thread has started
-    --pool.setup.threadSync;
-    pool.setup.radio.notify_one();
+        friend class std::thread;
 
-    //Wakeup when all threads have started
-    unique_lock<mutex> signalLock(signal);
-    radio.wait(signalLock);
-}
+    private:
+        void init();
+        void run();
+        bool is_task_available();
+        task_type* get_task();
 
-template <class MemInterface>
-void BaseThread<MemInterface>::Sleep(bool (Thread::*wakeUp)())
-{
-    unique_lock<mutex> signalLock(signal);
-    while (!(this->*wakeUp)() && pool.setup.requestExit != ThreadPool::RequestStop)
-    {
-        radio.wait(signalLock);
-    }
-}
-
-template <class MemInterface>
-void BaseThread<MemInterface>::Wakeup()
-{
-    unique_lock<mutex> signalLock(signal);
-    radio.notify_one();
-}
-
-template <class MemInterface>
-void BaseThread<MemInterface>::Join()
-{
-    taskThread.join();
-}
-
-template <class MemInterface>
-bool BaseThread<MemInterface>::IsTaskAvailable()
-{
-   for(auto queue : taskQueue)
-   {
-       if (!queue->empty())
-       {
-           return true;
-       }
-   }
-
-   return  pool.taskGraph->IsTaskAvailable();
-}
-
-template <class MemInterface>
-void BaseThread<MemInterface>::Run()
-{
-    ProfileTime scheduling(0ms), sleeping(0ms), working(0ms);
-
-    cout << "Starting Thread " << uint32_t(threadIndex) << endl;
-
-    while (pool.setup.requestExit != ThreadPool::RequestStop)
-    {
-        //Steal Task
-        Task* runTask = Instrument<Task*, Thread, Task*(Thread::*)()>(scheduling, this, &Thread::GetTask);
-
-        if (runTask)
-        {
-            //Run Task
-            ProfileTime taskTime(0ms);
-            ++pool.numWorking;
-            Instrument<void, Task, void(Task::*)()>(taskTime, runTask, &Task::operator());
-            --pool.numWorking;
-            cout << "Thread(" << uint32_t(threadIndex) << "), Task " << runTask->debug.taskName << "(" << chrono::duration_cast<chrono::milliseconds>(taskTime).count() << "ms)" << endl;
-            working += taskTime;
-
-            //Donate More Tasks
-            Instrument<void, Task, void(Task::*)()>(scheduling, runTask, &Task::KickDependentTasks);
-        }
-        else if (!IsTaskAvailable())
-        {
-            //Go to sleep if there is no task to run
-            Instrument<void, Thread, void(Thread::*)( bool(Thread::*)() ) >(sleeping, this, &Thread::Sleep, &Thread::IsTaskAvailable);
-        }
+        thread_pool& pool;
+        std::mutex signal;
+        std::condition_variable radio;
     };
 
-    assert(!IsTaskAvailable());
-
-    auto schedulingMS = chrono::duration_cast<chrono::milliseconds>(scheduling);
-    auto sleepingMS = chrono::duration_cast<chrono::milliseconds>(sleeping);
-    auto workingMS = chrono::duration_cast<chrono::milliseconds>(working);
-    auto schedulingRatio = double(working.count() / (scheduling.count() == 0 ? 1 : scheduling.count()));
-    cout << "Thread " << uint32_t(threadIndex) << " Complete, Scheduling Overhead=" << schedulingMS.count() << "ms, Sleep Time=" << sleepingMS.count() << "ms, Work Time=" << workingMS.count() << "ms, Work/Schedule Ratio=" << fixed << setprecision(0) << schedulingRatio << endl;
-}
-
-template <class MemInterface>
-typename BaseThread<MemInterface>::Task* BaseThread<MemInterface>::GetTask()
-{
-    Task *nextTask = nullptr;
-    for (uint32_t priority = 0; priority < Task::NUM_PRIORITY; priority++)
+    template <class TMemInterface>
+    base_thread<TMemInterface>::base_thread(uint8_t _thread_index, thread_pool* _pool) :
+        thread_index(_thread_index),
+        pool(*_pool)
     {
-        //Try to get a task from the thread queue
-        if (taskQueue[priority]->pop_front(nextTask))
+        for (auto& queue : task_queue)
         {
-            break;
+            queue = new task_queue_type(&allocator);
         }
 
-        //Try to get a task from the global queue
-        if (nextTask = pool.taskGraph->DequeueTask(priority))
+        task_thread = std::thread([&] {
+            init();
+            run();
+        });
+    }
+
+    template <class TMemInterface>
+    base_thread<TMemInterface>::~base_thread()
+    {
+        for (auto& queue : task_queue)
         {
-            pool.queueRank[priority][threadIndex].fetch_add(nextTask->persistent.rank);
-            break;
+            delete queue;
+            queue = nullptr;
         }
     }
 
-    return nextTask;
-}
+    template <class TMemInterface>
+    base_thread<TMemInterface>* base_thread<TMemInterface>::create_thread(thread_pool* _pool)
+    {
+        static uint32_t next_thread_num = 0;
+        return new thread_type(next_thread_num++, _pool);
+    }
+
+    template <class TMemInterface>
+    void base_thread<TMemInterface>::init()
+    {
+        thread_id = this_thread::get_id();
+        pool.current_thread = this;
+
+        // Signal thread_type has started
+        --pool.setup.thread_sync;
+        pool.setup.radio.notify_one();
+
+        //wake_up when all threads have started
+        unique_lock<mutex> signalLock(signal);
+        radio.wait(signalLock);
+    }
+
+    template <class TMemInterface>
+    void base_thread<TMemInterface>::sleep(bool (thread_type::*_wake_up)())
+    {
+        unique_lock<mutex> signal_lock(signal);
+        while (!(this->*_wake_up)() && pool.setup.request_exit != thread_pool::request_stop)
+        {
+            radio.wait(signal_lock);
+        }
+    }
+
+    template <class TMemInterface>
+    void base_thread<TMemInterface>::wake_up()
+    {
+        unique_lock<mutex> signal_lock(signal);
+        radio.notify_one();
+    }
+
+    template <class TMemInterface>
+    void base_thread<TMemInterface>::join()
+    {
+        task_thread.join();
+    }
+
+    template <class TMemInterface>
+    bool base_thread<TMemInterface>::is_task_available()
+    {
+        for (auto queue : task_queue)
+        {
+            if (!queue->empty())
+            {
+                return true;
+            }
+        }
+
+        return  pool.task_graph->is_task_available();
+    }
+
+    template <class TMemInterface>
+    void base_thread<TMemInterface>::run()
+    {
+        profile_time scheduling(0ms), sleeping(0ms), working(0ms);
+
+        std::cout << "Starting thread_type " << uint32_t(thread_index) << std::endl;
+
+        while (pool.setup.request_exit != thread_pool::request_stop)
+        {
+            //Steal task_type
+            task_type* run_task = instrument<task_type*, thread_type, task_type*(thread_type::*)()>(scheduling, this, &thread_type::get_task);
+
+            if (run_task)
+            {
+                //Run task_type
+                profile_time task_time(0ms);
+                ++pool.num_working;
+                instrument<void, task_type, void(task_type::*)()>(task_time, run_task, &task_type::operator());
+                --pool.num_working;
+                std::cout << "thread_type(" << uint32_t(thread_index) << "), task_type " << run_task->debug.task_name << "(" << chrono::duration_cast<chrono::milliseconds>(task_time).count() << "ms)" << std::endl;
+                working += task_time;
+
+                //Donate More Tasks
+                instrument<void, task_type, void(task_type::*)()>(scheduling, run_task, &task_type::kick_dependent_tasks);
+            }
+            else if (!is_task_available())
+            {
+                //Go to sleep if there is no task to run
+                instrument<void, thread_type, void(thread_type::*)(bool(thread_type::*)()) >(sleeping, this, &thread_type::sleep, &thread_type::is_task_available);
+            }
+        };
+
+        assert(!is_task_available());
+
+        auto scheduling_ms = chrono::duration_cast<chrono::milliseconds>(scheduling);
+        auto sleeping_ms = chrono::duration_cast<chrono::milliseconds>(sleeping);
+        auto working_ms = chrono::duration_cast<chrono::milliseconds>(working);
+        auto scheduling_ratio = double(working.count() / (scheduling.count() == 0 ? 1 : scheduling.count()));
+        std::cout << "thread_type " << uint32_t(thread_index) << " Complete, Scheduling Overhead=" << scheduling_ms.count() << "ms, sleep Time=" << sleeping_ms.count() << "ms, Work Time=" << working_ms.count() << "ms, Work/Schedule Ratio=" << fixed << setprecision(0) << scheduling_ratio << std::endl;
+    }
+
+    template <class TMemInterface>
+    typename base_thread<TMemInterface>::task_type* base_thread<TMemInterface>::get_task()
+    {
+        task_type *next_task = nullptr;
+        for (uint32_t priority = 0; priority < task_type::NUM_PRIORITY; priority++)
+        {
+            //Try to get a task from the thread queue
+            if (task_queue[priority]->pop_front(next_task))
+            {
+                break;
+            }
+
+            //Try to get a task from the global queue
+            if (next_task = pool.task_graph->dequeue_task(priority))
+            {
+                pool.queue_rank[priority][thread_index].fetch_add(next_task->persistent.rank);
+                break;
+            }
+        }
+
+        return next_task;
+    }
+
+};

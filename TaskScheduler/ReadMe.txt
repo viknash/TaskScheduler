@@ -41,9 +41,9 @@ should add to or customize.
 
 To Do
 2. Create one dispenser for all tasks
-4. Implement Thread Memory Allocators
-5. Implement Thread Memory Reclamation Lock Free List
-6. Run Thread Memory Reclamation before thread sleeps and periodically
+4. Implement thread_type Memory Allocators
+5. Implement thread_type Memory Reclamation Lock Free List
+6. Run thread_type Memory Reclamation before thread sleeps and periodically
 12. Augment ranking with heuristics based on last execution time for a task
 13. Implement data parallel tasks
 14. Implement natvis for taskgraph, lockfree queue
