@@ -79,7 +79,7 @@ namespace task_scheduler {
     template <class TMemInterface>
     base_thread<TMemInterface>* base_thread<TMemInterface>::create_thread(thread_pool* _pool)
     {
-        static uint32_t next_thread_num = 0;
+        static uint8_t next_thread_num = 0;
         return new thread_type(next_thread_num++, _pool);
     }
 
@@ -189,7 +189,8 @@ namespace task_scheduler {
             }
 
             //Try to get a task from the global queue
-            if (next_task = pool.task_graph->dequeue_task(priority))
+            next_task = pool.task_graph->dequeue_task(priority);
+            if (next_task)
             {
                 pool.queue_rank[priority][thread_index].fetch_add(next_task->persistent.rank);
                 break;

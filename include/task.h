@@ -124,7 +124,6 @@ namespace task_scheduler {
     void base_task<TMemInterface>::kick_dependent_tasks()
     {
         //Reduce queue rank of queue that the current task is running on
-        priority_selector currentTaskPriority = persistent.task_priority;
         task_graph.pool.queue_rank[persistent.task_priority][task_graph.pool.current_thread->thread_index].fetch_sub(persistent.rank);
 
         //Queue dependent tasks only when their start gates are 0
@@ -188,7 +187,7 @@ namespace task_scheduler {
                 initializedSubGraph = true;
             }
             uint64_t start_gate = kick_task->transient.start_gate.load();
-            assert(start_gate == 0);
+            assert(start_gate == 0); start_gate;
             task_graph.queue_task(kick_task);
         }
     }

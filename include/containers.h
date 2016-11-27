@@ -45,7 +45,8 @@ namespace task_scheduler {
     template <typename T, class TMemInterface>
     struct class_alignment atomic_lock_free_node_ptr : public TMemInterface {
         typedef atomic_lock_free_node<T, TMemInterface> atomic_node;
-
+#pragma warning( push )  
+#pragma warning( disable : 4201 )  
         union Data {
             struct
             {
@@ -54,7 +55,7 @@ namespace task_scheduler {
             };
             atomics::type as_atomic[2];
         };
-
+#pragma warning( pop )  
         inline void clear()
         {
             data.access.ptr = nullptr;

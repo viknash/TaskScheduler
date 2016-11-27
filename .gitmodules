@@ -1,0 +1,3 @@
+[submodule "deps/IntelSEAPI"]
+	path = deps/IntelSEAPI
+	url = https://github.com/01org/IntelSEAPI.git

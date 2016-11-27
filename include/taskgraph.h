@@ -175,12 +175,13 @@ namespace task_scheduler {
         using namespace std::placeholders;
 
         string_type line;
-        std::ifstream task_file(_file_name.c_str());
+        std::ifstream task_file(_file_name.c_str(), std::ios::in);
+        assert(task_file.is_open()); //File was not found
         while (getline(task_file, line)) {
             typedef std::basic_istringstream<char, std::char_traits<char>,
                 stl_allocator<char, TMemInterface>>
-                istringstream;
-            istringstream iss(line);
+                istringstream_type;
+            istringstream_type iss(line);
             string_type token;
             auto new_task = new task_type(*this);
             unsigned int _task_file_field = 0;
@@ -213,7 +214,7 @@ namespace task_scheduler {
         // initialize head tasks
         auto found = find_head(persistent.head_tasks);
         // Check if we have at least one head
-        assert(found);
+        assert(found); found;
 
         // Setup end nodes to start head nodes
         setup_tail_kickers();
@@ -243,8 +244,9 @@ namespace task_scheduler {
                 void* param = nullptr;
                 depth_first_visitor(kick_task,
                     bind(
-                        [](task_type* node, void*& param, task_set* _sub_graph_set,
+                        [](task_type* node, void*& _param, task_set* _sub_graph_set,
                             sub_graph_type* _sub_graph) {
+                    _param;
                     _sub_graph_set->insert(node);
                     node->persistent.sub_graph = _sub_graph;
                 },
@@ -291,6 +293,7 @@ namespace task_scheduler {
             void* param = nullptr;
             depth_first_visitor(head_task,
                 [&](task_type* _task, void*& _param) {
+                _param;
                 set_task_thread_affinity(_task,
                     _task->persistent.thread_affinity);
             },
@@ -334,6 +337,7 @@ namespace task_scheduler {
                 bind(
                     [](task_type* _tail_task, void*& _param, task_type* _head_task,
                         task_vector* _tail_tasks) {
+                _param;
                 // Only add unique items
                 auto result = find(begin(*_tail_tasks), end(*_tail_tasks), _tail_task);
                 if (result == end(*_tail_tasks)) {
@@ -444,7 +448,6 @@ namespace task_scheduler {
     void base_task_graph<TMemInterface>::queue_task(task_type* _task,
         uint8_t _num_threads_to_wake_up)
     {
-        bool result = false;
         uint32_t priority = _task->persistent.task_priority;
         do {
         } while (!transient.task_queue[priority]->push_back(_task) && ++priority < task_type::NUM_PRIORITY);

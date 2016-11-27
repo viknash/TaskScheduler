@@ -65,7 +65,7 @@ namespace task_scheduler {
 
     template <class TMemInterface>
     base_thread_pool<TMemInterface>::base_thread_pool(uint32_t _num_threads)
-        : num_threads(std::min(std::min(std::thread::hardware_concurrency(), MAX_NUM_THREADS), _num_threads))
+        : num_threads(static_cast<uint8_t>(std::min(std::min(std::thread::hardware_concurrency(), MAX_NUM_THREADS), _num_threads)))
         , task_graph(nullptr)
     {
         memset(threads, 0, sizeof(threads));
