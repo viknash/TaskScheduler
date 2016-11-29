@@ -448,7 +448,7 @@ namespace task_scheduler {
         lock_free_fixed_size_array(size_t _reserverd_size, bool _optimize_for_cache_line_size);
         lock_free_fixed_size_array(T* _existing_array, size_t _existing_array_size);
         size_t size() { return array_size; }
-        size_t reserved() { return array_reserved_size; }
+        size_t reserved() { return array_flags.reserved_size; }
         ~lock_free_fixed_size_array();
         T& operator[](size_t _index);
         T* operator&();
@@ -458,7 +458,7 @@ namespace task_scheduler {
         template <typename T, class TMemInterface> friend class lock_free_fixed_size_array_batch_dispenser;
 
         union flags {
-            size_t size : 62;
+            size_t reserved_size : 62;
             size_t read_locked : 1;
             size_t data_owner : 1;
         };
@@ -475,30 +475,30 @@ namespace task_scheduler {
 
 
     template <typename T, class TMemInterface>
-    lock_free_fixed_size_array<T, TMemInterface>::lock_free_fixed_size_array(size_t _reserverd_size, bool _optimize_for_cache_line_size) :
-        array_size(_size),
+    inline lock_free_fixed_size_array<T, TMemInterface>::lock_free_fixed_size_array(size_t _reserved_size, bool _optimize_for_cache_line_size) :
+        array_size(0),
         flags(0)
     {
-        array_flags.size = _reserverd_size;
+        array_flags.reserved_size = ~0;
+        uint64_t max_array_size = array_flags.reserved_size;
+        assert(_reserved_size < array_flags.reserved_size); // Requested size is too large
+        array_flags.reserved_size = _reserved_size;
         array_flags.data_owner = 1;
-        size_t bit_mask = sizeof(size_t) * 8 - 1;
-        assert(!(bit_mask & _reserverd_size)); // Requested size is too large
         uint32_t cache_line_size = _optimize_for_cache_line_size ? get_cache_line_size() : 1;
         data = new (cache_line_size) T[size];
     }
 
     template <typename T, class TMemInterface>
-    lock_free_fixed_size_array<T, TMemInterface>::lock_free_fixed_size_array(T* _existing_array, size_t _existing_array_size) :
+    inline lock_free_fixed_size_array<T, TMemInterface>::lock_free_fixed_size_array(T* _existing_array, size_t _existing_array_size) :
         data(_existing_array),
-        array_reserved_size(_existing_array_size),
-        array_size(_existing_array_size),
-        data_owner(0)
+        array_size(_existing_array_size)
     {
-
+        array_flags.reserved_size = _existing_array_size;
+        array_flags.data_owner = 0;
     }
 
     template <typename T, class TMemInterface>
-    lock_free_fixed_size_array<T, TMemInterface>::~lock_free_fixed_size_array()
+    inline lock_free_fixed_size_array<T, TMemInterface>::~lock_free_fixed_size_array()
     { 
         if (array_flags.data_owner)
         {
@@ -510,51 +510,51 @@ namespace task_scheduler {
     }
 
     template <typename T, class TMemInterface>
-    T& lock_free_fixed_size_array<T, TMemInterface>::operator[](size_t _index)
+    inline T& lock_free_fixed_size_array<T, TMemInterface>::operator[](size_t _index)
     {
         assert(_index < array_size); // Index out of bounds
         return data + _index;
     }
 
     template <typename T, class TMemInterface>
-    void lock_free_fixed_size_array<T, TMemInterface>::push_back(const T& _new_item)
+    inline void lock_free_fixed_size_array<T, TMemInterface>::push_back(const T& _new_item)
     {
         ++array_size;
-        assert(array_size <= array_reserved_size); //Exceeded size of array
+        assert(array_size <= array_flags.reserved_size); //Exceeded size of array
         assert(is_locked()); //Array has been locked for reading
         *(data + array_size - 1) = _new_item;
     }
 
     template <typename T, class TMemInterface>
-    void lock_free_fixed_size_array<T, TMemInterface>::clear()
+    inline void lock_free_fixed_size_array<T, TMemInterface>::clear()
     {
         assert(!is_locked()); //Array has been locked for reading
         array_size = 0;
     }
 
     template <typename T, class TMemInterface>
-    T* lock_free_fixed_size_array<T, TMemInterface>::operator&()
+    inline T* lock_free_fixed_size_array<T, TMemInterface>::operator&()
     {
         assert(!is_locked()); //Array has been locked for reading
         return data;
     }
 
     template <typename T, class TMemInterface>
-    void lock_free_fixed_size_array<T, TMemInterface>::lock()
+    inline void lock_free_fixed_size_array<T, TMemInterface>::lock()
     {
         assert(!array_flags.read_locked); //Array has already been locked before
-        array_reserved_size |= 1 << sizeof(size_t) * 8 - 1;
+        array_flags.read_locked = 1;
     }
 
     template <typename T, class TMemInterface>
-    void lock_free_fixed_size_array<T, TMemInterface>::unlock()
+    inline void lock_free_fixed_size_array<T, TMemInterface>::unlock()
     {
         assert(array_flags.read_locked); //Array has already been unlocked before
-        array_reserved_size &= bit_mask - 1;
+        array_flags.read_locked = 0;
     }
 
     template <typename T, class TMemInterface>
-    bool lock_free_fixed_size_array<T, TMemInterface>::is_locked()
+    inline bool lock_free_fixed_size_array<T, TMemInterface>::is_locked()
     {
         return array_flags.read_locked;
     }
@@ -566,7 +566,6 @@ namespace task_scheduler {
         lock_free_batch_dispatcher(TDataType& _data_type);
         ~lock_free_batch_dispatcher();
         T* get_next_batch(size_t _requested_batch_size, size_t& _returned_batch_size);
-        void reset();
 
     private:
         TDataType& data;
@@ -575,7 +574,7 @@ namespace task_scheduler {
 
 
     template <typename T, class TDataType, class TMemInterface>
-    lock_free_batch_dispatcher<T, TDataType, TMemInterface>::lock_free_batch_dispatcher(TDataType& _lock_free_fixed_size_array) :
+    inline lock_free_batch_dispatcher<T, TDataType, TMemInterface>::lock_free_batch_dispatcher(TDataType& _lock_free_fixed_size_array) :
         data(_lock_free_fixed_size_array),
         next_batch_index(0)
     {
@@ -583,19 +582,19 @@ namespace task_scheduler {
     }
 
     template <typename T, class TDataType, class TMemInterface>
-    lock_free_batch_dispatcher<T, TDataType, TMemInterface>::~lock_free_batch_dispatcher()
+    inline lock_free_batch_dispatcher<T, TDataType, TMemInterface>::~lock_free_batch_dispatcher()
     {
         data.unlock();
         DEBUGONLY(next_batch_index = 0;);
     }
 
     template <typename T, class TDataType, class TMemInterface>
-    T* lock_free_batch_dispatcher<T, TDataType, TMemInterface>::get_next_batch(size_t _requested_batch_size, size_t& _returned_batch_size)
+    inline T* lock_free_batch_dispatcher<T, TDataType, TMemInterface>::get_next_batch(size_t _requested_batch_size, size_t& _returned_batch_size)
     {
         size_t current_batch_index = next_batch_index.fetch_add(_requested_batch_size);
-        if (current_batch_index < array_size)
+        if (current_batch_index < data.array_size)
         {
-            _returned_batch_size = std::min(array_size - current_batch_index, _requested_batch_size);
+            _returned_batch_size = std::min(data.array_size - current_batch_index, _requested_batch_size);
             return data + current_batch_index;
         }
         else

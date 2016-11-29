@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <thread>
+#include <atomic>
 
 #if defined(_DEBUG)
 #define DEBUGONLY(x) x
@@ -23,36 +25,49 @@ namespace task_scheduler {
         return CreateMask64(args...) | 1ull << first;
     }
 
-#if 0
-    class multi_threaded_detector
+    class unsafe_multi_threaded_access_detector
     {
 
     public:
-        inline multi_threaded_detector()
+        inline unsafe_multi_threaded_access_detector()
         {
-            previous_thread_id = 0;
+            currently_accessing_thread_id = 0;
         }
 
         inline void enter()
         {
-            int64_t current_thread_id = std::this_thread::get_id();
-            previous_thread_id = G4::Atomic::Exchange(detector.GetCurrentThreadId(), currentThread);
-            bool valid = m_PreviousThreadId == currentThread || m_PreviousThreadId == 0;
-            assert(valid);
+            int64_t current_thread_id = std::hash<std::thread::id>()(std::this_thread::get_id());
+            int64_t previous_thread_id = currently_accessing_thread_id.exchange(current_thread_id);
+            assert(previous_thread_id == 0); previous_thread_id;
         }
 
-        inline void Exit(MultiThreadDetector& detector)
+        inline void exit()
         {
-            int64_t previousThreadId = exchange(detector.GetCurrentThreadId(), m_PreviousThreadId);
-            int64_t currentThread = std::this_thread::get_id();
-            bool valid = previousThreadId == currentThread || previousThreadId == 0;
-            assert!(valid);
+            int64_t previous_thread_id = currently_accessing_thread_id.exchange(0);
+            int64_t current_thread_id = std::hash<std::thread::id>()(std::this_thread::get_id());
+            assert(previous_thread_id == current_thread_id); current_thread_id; previous_thread_id;
         }
 
     private:
-
-        std::atomic_int64_t previous_thread_id;
+        std::atomic_int64_t currently_accessing_thread_id;
     };
-#endif
 
+    template<typename T>
+    class scoped_enter_exit
+    {
+        scoped_enter_exit(T& _item) :
+            item(_item)
+        {
+            item.enter();
+        }
+
+        ~scoped_enter_exit()
+        {
+            item.exit();
+        }
+
+        T item;
+    };
+
+    typedef scoped_enter_exit<unsafe_multi_threaded_access_detector> thread_unsafe_access_guard;
 };

@@ -86,7 +86,7 @@ namespace task_scheduler {
     template <class TMemInterface>
     void base_thread<TMemInterface>::init()
     {
-        thread_id = this_thread::get_id();
+        thread_id = std::this_thread::get_id();
         pool.current_thread = this;
 
         // Signal thread_type has started
