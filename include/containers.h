@@ -438,4 +438,142 @@ namespace task_scheduler {
         TPolicy queue;
     };
 
+
+    template <typename T, class TMemInterface = default_mem_interface>
+    class lock_free_fixed_size_array : public TMemInterface {
+
+    public:
+        lock_free_fixed_size_array(size_t _reserverd_size, bool _optimize_for_cache_line_size);
+        size_t size() { return dispenser_size; }
+        size_t reserved() { return dispenser_reserved_size; }
+        ~lock_free_dispenser() { delete[] data; DEBUGONLY(data = nullptr; dispenser_reserved_size = nullptr; dispenser_size = nullptr;); }
+        T& operator[](size_t i);
+        T* operator&*();
+        void push_back(const T& _new_item);
+        void clear();
+
+        friend template <typename T, class TMemInterface>
+            class lock_free_fixed_size_array_batch_dispenser;
+
+    private: 
+        void lock();
+        void unlock();
+        bool is_locked();
+
+        T* data;
+        atomic<size_t> dispenser_size;
+        size_t dispenser_reserved_size;
+    };
+
+
+    template <typename T, class TMemInterface>
+    lock_free_fixed_size_array<T, TMemInterface>::lock_free_fixed_size_array(size_t _reserverd_size, bool _optimize_for_cache_line_size) :
+        dispenser_reserved_size(_reserverd_size),
+        dispenser_size(_size)
+    {
+        size_t bit_mask = sizeof(size_t) * 8 - 1;
+        assert(!(bit_mask & _reserverd_size)); // Requested size is too large
+        uint32_t cache_line_size = _optimize_for_cache_line_size ? get_cache_line_size() : 1;
+        data = new (cache_line_size) T[size];
+    }
+
+    template <typename T, class TMemInterface>
+    T& lock_free_fixed_size_array<T, TMemInterface>::operator[](size_t _index)
+    {
+        assert(_index < dispenser_size); // Index out of bounds
+        return data + _index;
+    }
+
+    template <typename T, class TMemInterface>
+    void lock_free_fixed_size_array<T, TMemInterface>::push_back(const T& _new_item)
+    {
+        ++dispenser_size;
+        assert(dispenser_size <= dispenser_reserved_size); //Exceeded size of array
+        assert(is_locked()); //Array has been locked for reading
+        *(data + dispenser_size - 1) = _new_item;
+    }
+
+    template <typename T, class TMemInterface>
+    void lock_free_fixed_size_array<T, TMemInterface>::clear()
+    {
+        assert(!is_locked()); //Array has been locked for reading
+        dispenser_size = 0;
+    }
+
+    template <typename T, class TMemInterface>
+    T* lock_free_fixed_size_array<T, TMemInterface>::operator&()
+    {
+        assert(!is_locked()); //Array has been locked for reading
+        return data;
+    }
+
+    template <typename T, class TMemInterface>
+    void lock_free_fixed_size_array<T, TMemInterface>::lock()
+    {
+        size_t bit_mask = sizeof(size_t) * 8 - 1;
+        assert(!(dispenser_reserved_size & bit_mask)); //Array has already been locked before
+        dispenser_reserved_size |= 1 << sizeof(size_t) * 8 - 1;
+    }
+
+    template <typename T, class TMemInterface>
+    void lock_free_fixed_size_array<T, TMemInterface>::unlock()
+    {
+        size_t bit_mask = sizeof(size_t) * 8 - 1;
+        assert(dispenser_reserved_size & bit_mask); //Array has already been unlocked before
+        dispenser_reserved_size &= bit_mask - 1;
+    }
+
+    template <typename T, class TMemInterface>
+    bool lock_free_fixed_size_array<T, TMemInterface>::is_locked()
+    {
+        size_t bit_mask = sizeof(size_t) * 8 - 1;
+        return dispenser_reserved_size & bit_mask;
+    }
+
+
+    template <typename T, class TMemInterface = default_mem_interface>
+    class lock_free_fixed_size_array_batch_dispenser : public TMemInterface {
+    public:
+        lock_free_fixed_size_array_batch_dispenser(lock_free_fixed_size_array<T, TMemInterface> _lock_free_fixed_size_array);
+        ~lock_free_fixed_size_array_batch_dispenser();
+        T* get_next_batch(size_t _requested_batch_size, size_t& _returned_batch_size);
+        void reset();
+
+    private:
+        lock_free_fixed_size_array<T, TMemInterface>& data;
+        atomic<size_t> next_batch_index;
+    }
+
+
+    template <typename T, class TMemInterface>
+    lock_free_fixed_size_array_batch_dispenser<T, TMemInterface>::lock_free_fixed_size_array_batch_dispenser(lock_free_fixed_size_array<T, TMemInterface> _lock_free_fixed_size_array) :
+        data(_lock_free_fixed_size_array),
+        next_batch_index(0)
+    {
+        data.lock();
+    }
+
+    template <typename T, class TMemInterface>
+    lock_free_fixed_size_array_batch_dispenser<T, TMemInterface>::~lock_free_fixed_size_array_batch_dispenser()
+    {
+        data.unlock();
+        DEBUGONLY(next_batch_index = 0;);
+    }
+
+    template <typename T, class TMemInterface>
+    T* lock_free_fixed_size_array_batch_dispenser<T, TMemInterface>::get_next_batch(size_t _requested_batch_size, size_t& _returned_batch_size) 
+    {
+        size_t current_batch_index = next_batch_index.fetch_add(_requested_batch_size);
+        if (current_batch_index < dispenser_size)
+        {
+            _returned_batch_size = std::min(dispenser_size - current_batch_index, _requested_batch_size);
+            return data + current_batch_index;
+        }
+        else
+        {
+            _returned_batch_size = 0;
+            return nullptr;
+        }
+    }
+
 };

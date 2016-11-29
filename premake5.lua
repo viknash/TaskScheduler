@@ -41,6 +41,7 @@
 			{
 				"*.txt", "**.lua","**.md",
 				"samples/basic/**.h", "samples/basic/**.cpp",
+				"include/*.h"
 			}
 
 			excludes
