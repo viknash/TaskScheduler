@@ -88,8 +88,8 @@ namespace task_scheduler {
 
         void initialize(sub_graph_type* _sub_graph = nullptr);
         void load(string_type _file_name);
-        void set_task_thread_affinity(task_type* task, uint64_t _mask);
-        void set_task_thread_exclusion(task_type* task, uint64_t _mask);
+        void set_task_thread_affinity(task_type* _task, uint64_t _mask);
+        void set_task_thread_exclusion(task_type* _task, uint64_t _mask);
         void setup_tail_kickers();
         void depth_first_visitor(task_type* _task,
             std::function<void(task_type*, void*&)> _preorder_functor,
@@ -102,6 +102,7 @@ namespace task_scheduler {
         void queue_task(task_type* _task, uint8_t _num_threads_to_wake_up = 1);
         task_type* dequeue_task(uint32_t _priority);
         bool is_task_available();
+        bool link_task(task_type* _parent_task, task_type* _dependent_task);
 
     private:
         bool find_head(task_vector& _head_list);
@@ -476,4 +477,11 @@ namespace task_scheduler {
         return false;
     }
 
+    template <class TMemInterface>
+    bool base_task_graph<TMemInterface>::link_task(task_type* _parent_task, task_type* _dependent_task)
+    {
+        _parent_task->dependent_tasks.push_back(_dependent_task);
+        _dependent_task->parent_tasks.push_back(_parent_task);
+        return true;
+    }
 };

@@ -25,49 +25,51 @@ namespace task_scheduler {
         return CreateMask64(args...) | 1ull << first;
     }
 
+    template<class T>
     class unsafe_multi_threaded_access_detector
     {
 
     public:
-        inline unsafe_multi_threaded_access_detector()
+        inline unsafe_multi_threaded_access_detector() :
+            previous_thread_id(0)
         {
-            currently_accessing_thread_id = 0;
         }
 
-        inline void enter()
+        inline void enter(T& storage)
         {
-            int64_t current_thread_id = std::hash<std::thread::id>()(std::this_thread::get_id());
-            int64_t previous_thread_id = currently_accessing_thread_id.exchange(current_thread_id);
-            assert(previous_thread_id == 0); previous_thread_id;
+            int64_t new_thread_id = std::hash<std::thread::id>()(std::this_thread::get_id());
+            previous_thread_id = storage.exchange(new_thread_id);
+            assert(previous_thread_id == 0 || previous_thread_id == new_thread_id);
         }
 
-        inline void exit()
+        inline void exit(T& storage)
         {
-            int64_t previous_thread_id = currently_accessing_thread_id.exchange(0);
+            int64_t stored_thread_id = storage.exchange(previous_thread_id);
             int64_t current_thread_id = std::hash<std::thread::id>()(std::this_thread::get_id());
-            assert(previous_thread_id == current_thread_id); current_thread_id; previous_thread_id;
+            assert(stored_thread_id == current_thread_id || stored_thread_id == 0);
         }
 
     private:
-        std::atomic_int64_t currently_accessing_thread_id;
+        std::atomic_int64_t previous_thread_id;
     };
 
-    template<typename T>
-    class scoped_enter_exit
+    template<typename T, typename TParam>
+    class scoped_enter_exit : public T
     {
-        scoped_enter_exit(T& _item) :
-            item(_item)
+        scoped_enter_exit(TParam& _param) :
+            param(_param)
         {
-            item.enter();
+            enter(param);
         }
 
         ~scoped_enter_exit()
         {
-            item.exit();
+            exit(param);
         }
 
-        T item;
+        T param;
     };
 
-    typedef scoped_enter_exit<unsafe_multi_threaded_access_detector> thread_unsafe_access_guard;
+    typedef scoped_enter_exit<unsafe_multi_threaded_access_detector<std::atomic_int64_t>, std::atomic_int64_t> thread_unsafe_access_guard;
+    typedef std::atomic_int64_t thread_unsafe_access_storage;
 };

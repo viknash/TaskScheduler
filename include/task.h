@@ -67,6 +67,7 @@ namespace task_scheduler {
         base_task(task_graph_type& _task_graph);
         void kick_dependent_tasks();
         void operator()();
+        bool link_task(task_type* _next_task);
 
         debug_container debug;
         transient_container transient;
@@ -190,6 +191,12 @@ namespace task_scheduler {
             assert(start_gate == 0); start_gate;
             task_graph.queue_task(kick_task);
         }
+    }
+
+    template <class TMemInterface>
+    bool base_task<TMemInterface>::link_task(task_type* _next_task)
+    {
+        return task_graph.link_task(this, _next_task);
     }
 
 };
