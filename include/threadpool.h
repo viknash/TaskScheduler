@@ -46,7 +46,7 @@ namespace task_scheduler {
     public:
         base_thread_pool(uint32_t _num_threads = MAX_NUM_THREADS);
         void start(task_graph_type& task_graph);
-        void end();
+        void stop();
         void wake_up(uint8_t num_threads_to_wake_up = MAX_NUM_THREADS);
 
         static const uint32_t MAX_NUM_THREADS = 64;
@@ -92,7 +92,7 @@ namespace task_scheduler {
     }
 
     template <class TMemInterface>
-    void base_thread_pool<TMemInterface>::end()
+    void base_thread_pool<TMemInterface>::stop()
     {
         setup.thread_sync = (uint32_t)task_graph->persistent.sub_graphs.size();
         setup.request_exit.store(request_pause);

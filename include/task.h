@@ -31,6 +31,14 @@ namespace task_scheduler {
         typedef std::function<void()> function_type;
         typedef typename int64_t rank_type;
 
+        typedef lock_free_node_dispenser<typename function_type*, TMemInterface>
+            work_memory_allocator_type;
+        typedef typename lock_free_queue<multi_producer_multi_consumer<typename function_type*,
+            TMemInterface, work_memory_allocator_type>,
+            typename function_type*, TMemInterface,
+            work_memory_allocator_type*>
+            work_queue_type;
+
         enum priority_selector {
             REALTIME,
             HIGH,
@@ -52,6 +60,7 @@ namespace task_scheduler {
 
         struct persistent_container {
             persistent_container();
+            ~persistent_container();
 
             priority_selector task_priority;
             task_vector parent_tasks;
@@ -61,20 +70,19 @@ namespace task_scheduler {
             sub_graph_type* sub_graph;
             rank_type rank;
             int64_t thread_affinity;
-            uint8_t num_workers;
+            work_queue_type* work_queue;
+            work_memory_allocator_type work_allocator;
         };
 
-        base_task(task_graph_type& _task_graph);
-
-        void set_thread_affinity(uint64_t _mask);
-        void set_thread_exclusion(uint64_t _mask);
+        void set_thread_affinity(uint64_t mask);
+        void set_thread_exclusion(uint64_t mask);
         void set_num_workers(uint8_t _num_workers);
         void set_num_workers(percentage_t _percentage_workers);
-        bool link_task(task_type* _next_task);
-
-//    private:
+        base_task(task_graph_type& _task_graph);
         void kick_dependent_tasks();
+        bool add_task_parallel_work(function_type _work_function);
         void operator()();
+        bool link_task(task_type* _next_task);
 
         debug_container debug;
         transient_container transient;
@@ -101,13 +109,28 @@ namespace task_scheduler {
         , sub_graph(nullptr)
         , rank(0)
         , thread_affinity(0)
+        , work_queue(nullptr)
     {
+        work_queue = new work_queue_type(&work_allocator);
+    }
+
+    template <class TMemInterface>
+    base_task<TMemInterface>::persistent_container::~persistent_container()
+    {
+        assert(work_queue);
+        delete work_queue;
+        work_queue = nullptr;
     }
 
     template <class TMemInterface>
     void base_task<TMemInterface>::operator()()
     {
-        persistent.run_functor();
+        function_type* work_function = nullptr;
+        if(persistent.work_queue->pop_front(work_function))
+        {
+            (*work_function)();
+        }
+        //persistent.run_functor();
     }
 
     template <class TMemInterface>
@@ -216,6 +239,14 @@ namespace task_scheduler {
     bool base_task<TMemInterface>::link_task(task_type* _next_task)
     {
         return task_graph.link_task(this, _next_task);
+    }
+
+    template <class TMemInterface>
+    bool base_task<TMemInterface>::add_task_parallel_work(function_type _work_function)
+    {
+        //persistent.run_functor = _work_function;
+        persistent.work_queue->push_back(&_work_function);
+        return true;
     }
 
 };

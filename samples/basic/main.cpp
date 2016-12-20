@@ -73,14 +73,14 @@ int main()
     mt19937_64 gen(rd());
     uniform_int_distribution<uint64_t> dis(0, 63);
     for (auto& task : task_graph.debug.task_list) {
-        task->persistent.run_functor = bind(RandomTimeTask, 1ms, 16ms);
+        task->add_task_parallel_work(bind(RandomTimeTask, 1ms, 16ms));
         task->set_thread_affinity(CreateMask64(dis(gen), dis(gen), dis(gen)));
     }
 
     pool.start(task_graph);
     task_graph.kick();
     this_thread::sleep_for(30s);
-    pool.end();
+    pool.stop();
     system("pause");
     return 0;
 }
