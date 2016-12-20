@@ -280,8 +280,8 @@ namespace task_scheduler {
                     break;
                 }
 
-                DEBUGONLY(if (!nextSnapshot) continue;)
-                    value = nextSnapshot->load();
+                DEBUGONLY(if (!nextSnapshot) continue;);
+                value = nextSnapshot->load();
 
             } while (skip || !head.compare_exchange_weak(headSnapshot, headSnapshot));
 

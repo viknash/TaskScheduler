@@ -31,8 +31,6 @@ namespace task_scheduler {
     template <class TMemInterface>
     class base_task_graph : public TMemInterface {
     public:
-        static const uint32_t MAX_TASKS_PER_QUEUE = 200;
-
         typedef typename base_task<TMemInterface>::task_type task_type;
         typedef std::basic_string<char, std::char_traits<char>, stl_allocator<char, TMemInterface>>
             string_type;
@@ -53,6 +51,7 @@ namespace task_scheduler {
         typedef std::vector<task_type*, stl_allocator<task_type*, TMemInterface>> task_vector;
         typedef base_thread_pool<TMemInterface> thread_pool;
         typedef task_type* task_list;
+        typedef std::function<void(task_type*, void*&)> traversal_function_type;
 
         struct persistent_container {
             task_vector head_tasks;
@@ -90,12 +89,14 @@ namespace task_scheduler {
         void load(string_type _file_name);
         void set_task_thread_affinity(task_type* _task, uint64_t _mask);
         void set_task_thread_exclusion(task_type* _task, uint64_t _mask);
+        void set_num_workers(task_type* _task, uint8_t _num_workers);
+        void set_percentage_of_workers(task_type* _task, float _percentage_workers);
         void setup_tail_kickers();
         void depth_first_visitor(task_type* _task,
-            std::function<void(task_type*, void*&)> _preorder_functor,
-            std::function<void(task_type*, void*&)> _inorder_functor,
-            std::function<void(task_type*, void*&)> _post_order_functor,
-            std::function<void(task_type*, void*&)> _tail_functor, void* _param,
+            traversal_function_type _preorder_functor,
+            traversal_function_type _inorder_functor,
+            traversal_function_type _post_order_functor,
+            traversal_function_type _tail_functor, void* _param,
             bool _bottom_up = false);
         void kick();
 
@@ -260,7 +261,7 @@ namespace task_scheduler {
         }
 
         task_set ranked_tasks;
-        std::function<void(task_type*, void*&)> ranking_func = [](task_type* nodeTask, void*& param) {
+        traversal_function_type ranking_func = [](task_type* nodeTask, void*& param) {
             param = (void*)1;
             nodeTask->persistent.rank += (task_type::rank_type)(param);
             std::cout << nodeTask->debug.task_name
@@ -327,6 +328,21 @@ namespace task_scheduler {
     }
 
     template <class TMemInterface>
+    void base_task_graph<TMemInterface>::set_num_workers(task_type* _task,
+        uint8_t _num_workers)
+    {
+        _task->persistent.num_workers = min(pool.num_threads, _num_workers);
+    }
+
+    template <class TMemInterface>
+    void base_task_graph<TMemInterface>::set_percentage_of_workers(task_type* _task,
+        float _percentage_workers)
+    {
+        assert(_percentage_workers > .0f && _percentage_workers <= 1.0f);
+        _task->persistent.num_workers = ceil(_percentage_workers*(float)pool.num_threads);
+    }
+
+    template <class TMemInterface>
     void base_task_graph<TMemInterface>::setup_tail_kickers()
     {
         using namespace std::placeholders;
@@ -353,10 +369,11 @@ namespace task_scheduler {
 
     template <class TMemInterface>
     void base_task_graph<TMemInterface>::depth_first_visitor(
-        task_type* _task, std::function<void(task_type*, void*&)> _pre_order_functor,
-        std::function<void(task_type*, void*&)> _in_order_functor,
-        std::function<void(task_type*, void*&)> _post_order_functor,
-        std::function<void(task_type*, void*&)> _tail_functor, void* _param, bool _bottom_up)
+        task_type* _task,
+        traversal_function_type _pre_order_functor,
+        traversal_function_type _in_order_functor,
+        traversal_function_type _post_order_functor,
+        traversal_function_type _tail_functor, void* _param, bool _bottom_up)
     {
         if (_pre_order_functor)
             _pre_order_functor(_task, _param);

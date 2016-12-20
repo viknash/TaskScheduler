@@ -4,6 +4,7 @@
 
 #include "meta.h"
 #include "memory.h"
+#include "types.h"
 
 namespace task_scheduler {
 
@@ -60,14 +61,20 @@ namespace task_scheduler {
             sub_graph_type* sub_graph;
             rank_type rank;
             int64_t thread_affinity;
+            uint8_t num_workers;
         };
 
-        void set_thread_affinity(uint64_t mask);
-        void set_thread_exclusion(uint64_t mask);
         base_task(task_graph_type& _task_graph);
+
+        void set_thread_affinity(uint64_t _mask);
+        void set_thread_exclusion(uint64_t _mask);
+        void set_num_workers(uint8_t _num_workers);
+        void set_num_workers(percentage_t _percentage_workers);
+        bool link_task(task_type* _next_task);
+
+//    private:
         void kick_dependent_tasks();
         void operator()();
-        bool link_task(task_type* _next_task);
 
         debug_container debug;
         transient_container transient;
@@ -113,6 +120,18 @@ namespace task_scheduler {
     void base_task<TMemInterface>::set_thread_exclusion(uint64_t _mask)
     {
         task_graph.set_task_thread_exclusion(this, _mask);
+    }
+
+    template <class TMemInterface>
+    void base_task<TMemInterface>::set_num_workers(uint8_t _num_workers)
+    {
+        task_graph.set_num_workers(this, _num_workers);
+    }
+
+    template <class TMemInterface>
+    void base_task<TMemInterface>::set_num_workers(percentage_t _percentage_workers)
+    {
+        task_graph.set_percentage_of_workers(this, _percentage_workers);
     }
 
     template <class TMemInterface>
