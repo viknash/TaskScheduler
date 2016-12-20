@@ -262,13 +262,20 @@ namespace task_scheduler {
                 //Run task_type
                 profile_time task_time(0ms);
                 ++pool.num_working;
-                instrument<void, task_type, void(task_type::*)()>(task_time, run_task, &task_type::operator());
+                ++run_task->transient.num_working;
+                while(instrument<bool, task_type, bool(task_type::*)()>(task_time, run_task, &task_type::operator())) {};
+                --run_task->transient.num_working;
                 --pool.num_working;
                 std::cout << "thread_type(" << uint32_t(thread_index) << "), task_type " << run_task->debug.task_name << "(" << chrono::duration_cast<chrono::milliseconds>(task_time).count() << "ms)" << std::endl;
                 working += task_time;
 
-                //Donate More Tasks
-                instrument<void, task_type, void(task_type::*)()>(scheduling, run_task, &task_type::kick_dependent_tasks);
+                if (run_task->transient.num_working == 0)
+                {
+                    //Reset, Cleanup, ....
+                    instrument<void, task_type, void(task_type::*)()>(scheduling, run_task, &task_type::finalize);
+                    //Donate More Tasks
+                    instrument<void, task_type, void(task_type::*)()>(scheduling, run_task, &task_type::kick_dependent_tasks);
+                }
             }
             else if (!is_task_available())
             {
@@ -313,25 +320,36 @@ namespace task_scheduler {
             do {
                 task_type *stolen_task = nullptr;
                 task_queue_type temporary_queue(&(pool.threads[current_thread_index]->allocator));
+                bool touched_thread = false;
                 do {
                     if (pool.threads[current_thread_index]->task_queue[priority]->pop_front(stolen_task))
                     {
                         if (stolen_task->persistent.thread_affinity & current_thread_index.get_mask())
                         {
-                            //Stole a task
+                            //Steal task
                             next_task = stolen_task;
                             break;
                         }
                         else
                         {
+                            //Over steal
                             temporary_queue.push_back(stolen_task);
                         }
+                        touched_thread = true;
                     }
                 } while (!pool.threads[current_thread_index]->task_queue[priority]->empty());
 
                 while (!temporary_queue.empty())
                 {
+                    //Return tasks
                     pool.threads[current_thread_index]->task_queue[priority]->push_back(stolen_task);
+                }
+
+                //We have to wakeup the thread as long as its task queue is touched
+                //There could be task that was stolen and returned, but the thread went to sleep during the steal and before the return
+                if (touched_thread)
+                {
+                    pool.threads[current_thread_index]->wake_up();
                 }
 
                 if (next_task)

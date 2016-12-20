@@ -30,21 +30,21 @@ namespace task_scheduler {
     {
 
     public:
-        inline unsafe_multi_threaded_access_detector() :
+        unsafe_multi_threaded_access_detector() :
             previous_thread_id(0)
         {
         }
 
-        inline void enter(T& storage)
+        void enter(T& storage)
         {
             int64_t new_thread_id = std::hash<std::thread::id>()(std::this_thread::get_id());
-            previous_thread_id = storage.exchange(new_thread_id);
+            previous_thread_id = storage.last_thread_id.exchange(new_thread_id);
             assert(previous_thread_id == 0 || previous_thread_id == new_thread_id);
         }
 
-        inline void exit(T& storage)
+        void exit(T& storage)
         {
-            int64_t stored_thread_id = storage.exchange(previous_thread_id);
+            int64_t stored_thread_id = storage.last_thread_id.exchange(previous_thread_id);
             int64_t current_thread_id = std::hash<std::thread::id>()(std::this_thread::get_id());
             assert(stored_thread_id == current_thread_id || stored_thread_id == 0);
         }
@@ -56,6 +56,7 @@ namespace task_scheduler {
     template<typename T, typename TParam>
     class scoped_enter_exit : public T
     {
+    public:
         scoped_enter_exit(TParam& _param) :
             param(_param)
         {
@@ -67,9 +68,18 @@ namespace task_scheduler {
             exit(param);
         }
 
-        T param;
+    private:
+        TParam& param;
     };
 
-    typedef scoped_enter_exit<unsafe_multi_threaded_access_detector<std::atomic_int64_t>, std::atomic_int64_t> thread_unsafe_access_guard;
-    typedef std::atomic_int64_t thread_unsafe_access_storage;
+    struct thread_unsafe_access_storage
+    {
+        thread_unsafe_access_storage() :
+            last_thread_id(0)
+        {
+        }
+        std::atomic_int64_t last_thread_id;
+    };
+
+    typedef scoped_enter_exit<unsafe_multi_threaded_access_detector<thread_unsafe_access_storage>, thread_unsafe_access_storage> thread_unsafe_access_guard;
 };

@@ -136,7 +136,9 @@ namespace task_scheduler {
             task_list = &(debug.task_list);
         }
         for (auto task : *task_list) {
-            memset(&(task->transient), 0x0, sizeof(task_type::transient_container));
+            //memset(&(task->transient), 0x0, sizeof(task_type::transient_container));
+            task->transient.start_gate = 0;
+            task->transient.num_working = 0;
         }
         for (auto task : *task_list) {
             for (auto dependent_task : task->persistent.dependent_tasks) {

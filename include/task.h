@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <vector>
 
 #include "meta.h"
 #include "memory.h"
@@ -30,6 +31,7 @@ namespace task_scheduler {
         typedef base_thread_pool<TMemInterface> thread_pool;
         typedef std::function<void()> function_type;
         typedef typename int64_t rank_type;
+        typedef std::vector<function_type> task_work_vector;
 
         typedef lock_free_node_dispenser<typename function_type*, TMemInterface>
             work_memory_allocator_type;
@@ -55,7 +57,13 @@ namespace task_scheduler {
         };
 
         struct transient_container {
+            transient_container();
+            ~transient_container();
+
             std::atomic_int64_t start_gate;
+            work_queue_type* work_queue;
+            work_memory_allocator_type work_allocator;
+            std::atomic_int64_t  num_working;
         };
 
         struct persistent_container {
@@ -66,12 +74,10 @@ namespace task_scheduler {
             task_vector parent_tasks;
             task_vector dependent_tasks;
             task_vector kick_tasks;
-            function_type run_functor;
             sub_graph_type* sub_graph;
             rank_type rank;
             int64_t thread_affinity;
-            work_queue_type* work_queue;
-            work_memory_allocator_type work_allocator;
+            task_work_vector task_work;
         };
 
         void set_thread_affinity(uint64_t mask);
@@ -79,15 +85,19 @@ namespace task_scheduler {
         void set_num_workers(uint8_t _num_workers);
         void set_num_workers(percentage_t _percentage_workers);
         base_task(task_graph_type& _task_graph);
+        ~base_task();
+        void finalize();
         void kick_dependent_tasks();
         bool add_task_parallel_work(function_type _work_function);
-        void operator()();
+        bool operator()();
         bool link_task(task_type* _next_task);
 
         debug_container debug;
         transient_container transient;
         persistent_container persistent;
         task_graph_type& task_graph;
+
+        thread_unsafe_access_storage add_task_parallel_work_detector;
     };
 
     template <class TMemInterface>
@@ -109,13 +119,24 @@ namespace task_scheduler {
         , sub_graph(nullptr)
         , rank(0)
         , thread_affinity(0)
-        , work_queue(nullptr)
+    {
+    }
+
+    template <class TMemInterface>
+    base_task<TMemInterface>::persistent_container::~persistent_container()
+    {
+    }
+
+    template <class TMemInterface>
+    base_task<TMemInterface>::transient_container::transient_container()
+        : work_queue(nullptr),
+        num_working(0)
     {
         work_queue = new work_queue_type(&work_allocator);
     }
 
     template <class TMemInterface>
-    base_task<TMemInterface>::persistent_container::~persistent_container()
+    base_task<TMemInterface>::transient_container::~transient_container()
     {
         assert(work_queue);
         delete work_queue;
@@ -123,14 +144,15 @@ namespace task_scheduler {
     }
 
     template <class TMemInterface>
-    void base_task<TMemInterface>::operator()()
+    bool base_task<TMemInterface>::operator()()
     {
         function_type* work_function = nullptr;
-        if(persistent.work_queue->pop_front(work_function))
+        if(transient.work_queue->pop_front(work_function))
         {
             (*work_function)();
+            return true;
         }
-        //persistent.run_functor();
+        return false;
     }
 
     template <class TMemInterface>
@@ -161,6 +183,21 @@ namespace task_scheduler {
     base_task<TMemInterface>::base_task(task_graph_type& _task_graph)
         : task_graph(_task_graph)
     {
+    }
+
+    template <class TMemInterface>
+    base_task<TMemInterface>::~base_task()
+    {
+        persistent.task_work.clear();
+    }
+
+    template <class TMemInterface>
+    void base_task<TMemInterface>::finalize()
+    {
+        for(auto& work: persistent.task_work)
+        {
+            transient.work_queue->push_back(&work);
+        }
     }
 
     template <class TMemInterface>
@@ -244,8 +281,10 @@ namespace task_scheduler {
     template <class TMemInterface>
     bool base_task<TMemInterface>::add_task_parallel_work(function_type _work_function)
     {
-        //persistent.run_functor = _work_function;
-        persistent.work_queue->push_back(&_work_function);
+        thread_unsafe_access_guard guard(add_task_parallel_work_detector);
+        assert(transient.num_working == 0);
+        persistent.task_work.push_back(_work_function);
+        transient.work_queue->push_back(&persistent.task_work.back());
         return true;
     }
 
