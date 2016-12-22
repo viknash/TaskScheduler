@@ -58,4 +58,41 @@
 
 			filter "system:windows"
 
+	group "tests"
+
+		project "multi_threaded_detector"
+			targetname  "multi_threaded_detector"
+			language    "C++"
+			kind        "ConsoleApp"
+			location    "tests/multi_threaded_detector"
+			includedirs { "tests/multi_threaded_detector", "include", "packages/googletest.1.8.0.0/build/native/include" }
+			debugdir    "tests/multi_threaded_detector"
+			pchheader   "stdafx.h"
+			pchsource   "tests/multi_threaded_detector/stdafx.cpp"
+
+			files
+			{
+				"*.txt", "**.lua","**.md",
+				"tests/multi_threaded_detector/**.h", "tests/multi_threaded_detector/**.cpp",
+				"include/*.h",
+                "packages/googletest.1.8.0.0/build/native/include/gtest/**.h"
+			}
+
+			excludes
+			{
+			}
+
+			filter "configurations:debug"
+				targetdir   "bin/debug"
+				debugdir    "samples/basic"
+                links       { "packages/googletest.1.8.0.0/build/native/lib/x64/v140/Debug/googletest_v140.lib" }
+
+			filter "configurations:release"
+				targetdir   "bin/release"
+				debugdir    "samples/basic"
+                links       { "packages/googletest.1.8.0.0/build/native/lib/x64/v140/Release/googletest_v140.lib" }
+
+			filter "system:windows"
+
+
 	group ""

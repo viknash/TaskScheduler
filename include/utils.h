@@ -11,12 +11,22 @@
 
 #if !defined(TASK_SCHEDULER_DEBUG)
 #error("TASK_SCHEDULER_DEBUG is not defined")
-#endif// !defined(TASK_SCHEDULER_DEBUG)
+#endif
 
-#if defined(TASK_SCHEDULER_DEBUG)
-#define ts_debug_only(x) x
-#else
+#if !defined(TASK_SCHEDULER_ASSERT)
+#error("TASK_SCHEDULER_ASSERT is not defined")
+#endif
+
+#if TASK_SCHEDULER_DEBUG == 0
 #define ts_debug_only(x)
+#else
+#define ts_debug_only(x) x
+#endif
+
+#if TASK_SCHEDULER_ASSERT == 0
+#define ts_assert(x)
+#else
+#define ts_assert(x) assert(x)
 #endif
 
 #define ts_join_string( arg0, arg1 ) ts_do_join( arg0, arg1 )
@@ -47,18 +57,22 @@ namespace task_scheduler {
         {
         }
 
-        void enter(T& storage)
+        bool enter(T& storage)
         {
             int64_t new_thread_id = std::hash<std::thread::id>()(std::this_thread::get_id());
             previous_thread_id = storage.last_thread_id.exchange(new_thread_id);
-            assert(previous_thread_id == 0 || previous_thread_id == new_thread_id);
+            bool success = previous_thread_id == 0 || previous_thread_id == new_thread_id;
+            assert(success);
+            return success;
         }
 
-        void exit(T& storage)
+        bool exit(T& storage)
         {
             int64_t stored_thread_id = storage.last_thread_id.exchange(previous_thread_id);
             int64_t current_thread_id = std::hash<std::thread::id>()(std::this_thread::get_id());
-            assert(stored_thread_id == current_thread_id || stored_thread_id == 0);
+            bool success = stored_thread_id == current_thread_id || stored_thread_id == 0;
+            assert(success);
+            return success;
         }
 
     private:

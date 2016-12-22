@@ -1,10 +1,5 @@
 #include "stdafx.h"
 
-#if defined(_DEBUG)
-#define TASK_SCHEDULER_DEBUG 1
-#else
-#define TASK_SCHEDULER_DEBUG 0
-#endif // defined(_DEBUG)
 #include <algorithm>
 #include <random>
 
@@ -19,33 +14,8 @@
 using namespace task_scheduler;
 using namespace std;
 
-default_mem_interface gDefaultMemInterface;
-
-void* operator new(size_t n)
-{
-    //DebugBreak();
-    return gDefaultMemInterface.operator new(n);
-}
-void operator delete(void* p, size_t n)
-{
-    //DebugBreak();
-    gDefaultMemInterface.operator delete(p, n);
-}
-
-void* operator new[](size_t n)
-{
-    //DebugBreak();
-    return gDefaultMemInterface.operator new[](n);
-}
-
-void operator delete[](void* p, size_t n)
-{
-    // DebugBreak();
-    gDefaultMemInterface.operator delete[](p, n);
-}
-
-template <>
-thread_local base_thread<default_mem_interface>* base_thread_pool<default_mem_interface>::current_thread = nullptr;
+task_scheduler_default_mem_interface_catch_all_allocations();
+task_scheduler_static_data();
 
 void RandomTimeTask(chrono::milliseconds minTaskTime, chrono::milliseconds maxTaskTime)
 {
@@ -64,8 +34,6 @@ void RandomTimeTask(chrono::milliseconds minTaskTime, chrono::milliseconds maxTa
         end = chrono::high_resolution_clock::now();
     }
 }
-
-task_scheduler_static_data();
 
 int main()
 {

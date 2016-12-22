@@ -63,6 +63,7 @@ namespace task_scheduler {
     };
 
     class default_mem_interface {
+
         struct metadata_type {
             size_t space;
         };
@@ -99,5 +100,12 @@ namespace task_scheduler {
         void* raw_pointer = (void*)((char*)aligned_pointer - (_size + sizeof(metadata_type) + alignment - metadata->space));
         free(raw_pointer);
     }
+
+#define task_scheduler_default_mem_interface_catch_all_allocations() \
+    default_mem_interface gDefaultMemInterface; \
+    void* operator new(size_t n){return gDefaultMemInterface.operator new(n);} \
+    void operator delete(void* p, size_t n){gDefaultMemInterface.operator delete(p, n);} \
+    void* operator new[](size_t n){return gDefaultMemInterface.operator new[](n);} \
+    void operator delete[](void* p, size_t n){gDefaultMemInterface.operator delete[](p, n);}
 
 };

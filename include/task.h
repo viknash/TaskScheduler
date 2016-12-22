@@ -206,13 +206,13 @@ namespace task_scheduler {
     void base_task<TMemInterface>::kick_dependent_tasks()
     {
         //Reduce queue rank of queue that the current task is running on
-        task_graph.pool.queue_rank[persistent.task_priority][task_graph.pool.current_thread->thread_index].fetch_sub(persistent.rank);
+        task_graph.pool.queue_rank[persistent.task_priority][task_graph.pool.get_current_thread()->thread_index].fetch_sub(persistent.rank);
 
         //Queue dependent tasks only when their start gates are 0
         //i.e. all parent tasks have been executed
 
         //If we are scheduling many tasks at once search for the next best ranked queue, starting from just after the queue that was just scheduled
-        reduce_starvation(new_search_index) thread_index_type best_search_index = task_graph.pool.current_thread->thread_index;
+        reduce_starvation(new_search_index) thread_index_type best_search_index = task_graph.pool.get_current_thread()->thread_index;
 
         for (auto dependent_task : persistent.dependent_tasks) {
             if (--dependent_task->transient.start_gate == 0) {

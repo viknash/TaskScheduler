@@ -252,3 +252,5 @@ paket-files/
 *.sln.iml
  
 /*.sln
+/tests/multi_threaded_detector/multi_threaded_detector.vcxproj
+/tests/multi_threaded_detector/multi_threaded_detector.vcxproj.filters

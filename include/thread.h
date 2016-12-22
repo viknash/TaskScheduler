@@ -90,7 +90,7 @@ namespace task_scheduler {
     void base_thread<TMemInterface>::init()
     {
         thread_id = std::this_thread::get_id();
-        pool.current_thread = this;
+        current_thread = this;
         std::ostringstream stringStream;
         stringStream << uint32_t(thread_index);
         thread_name = stringStream.str();

@@ -14,13 +14,13 @@ namespace task_scheduler {
     struct static_data_t
     {
         std::mutex io_mutex;
-        HANDLE console_handle;
+        ts_windows_only(HANDLE console_handle;);
         std::atomic<thread_num_t> next_thread_number;
+
         static_data_t() :
-            next_thread_number(1),
-            console_handle(0)
+            next_thread_number(1)
         {
-            console_handle = GetStdHandle(STD_OUTPUT_HANDLE);
+            ts_windows_only(console_handle = GetStdHandle(STD_OUTPUT_HANDLE););
         }
     };
 
@@ -28,14 +28,21 @@ namespace task_scheduler {
 
     thread_local std::string thread_name;
     thread_local thread_num_t thread_unique_number;
+    thread_local void* current_thread;
 
-    uint8_t get_thread_number()
+    inline uint8_t get_thread_number()
     {
         if (!thread_unique_number)
         {
             thread_unique_number = ++globals.next_thread_number;
         }
         return thread_unique_number;
+    }
+
+    template <class T>
+    T* get_current_thread()
+    {
+        return static_cast<T*>(current_thread);
     }
 
 #define task_scheduler_static_data() \

@@ -48,6 +48,7 @@ namespace task_scheduler {
         void start(task_graph_type& task_graph);
         void stop();
         void wake_up(thread_num_t num_threads_to_wake_up = max_num_threads);
+        thread_type* get_current_thread();
 
         setup_container setup;
         thread_num_t num_threads;
@@ -57,8 +58,6 @@ namespace task_scheduler {
         std::atomic<uint32_t> num_working;
 
         optimization std::atomic<typename task_type::rank_type> queue_rank[task_type::num_priority][max_num_threads];
-
-        thread_local static thread_type* current_thread;
     };
 
     template <class TMemInterface>
@@ -115,6 +114,12 @@ namespace task_scheduler {
             threads[thread_idx]->wake_up();
         }
         reduce_starvation(always_different_thread_woken_up_first) next_thread_index = (next_thread_index + 1) % num_threads;
+    }
+
+    template <class TMemInterface>
+    typename base_thread_pool<TMemInterface>::thread_type* base_thread_pool<TMemInterface>::get_current_thread()
+    {
+        return ::get_current_thread<thread_type>();
     }
 
 };
