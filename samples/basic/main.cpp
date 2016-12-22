@@ -1,5 +1,10 @@
 #include "stdafx.h"
 
+#if defined(_DEBUG)
+#define TASK_SCHEDULER_DEBUG 1
+#else
+#define TASK_SCHEDULER_DEBUG 0
+#endif // defined(_DEBUG)
 #include <algorithm>
 #include <random>
 
@@ -60,6 +65,8 @@ void RandomTimeTask(chrono::milliseconds minTaskTime, chrono::milliseconds maxTa
     }
 }
 
+task_scheduler_static_data();
+
 int main()
 {
     typedef base_task_graph<default_mem_interface> task_graph_type;
@@ -74,7 +81,7 @@ int main()
     uniform_int_distribution<uint64_t> dis(0, 63);
     for (auto& task : task_graph.debug.task_list) {
         task->add_task_parallel_work(bind(RandomTimeTask, 1ms, 16ms));
-        task->set_thread_affinity(CreateMask64(dis(gen), dis(gen), dis(gen)));
+        task->set_thread_affinity(create_mask_64(dis(gen), dis(gen), dis(gen)));
     }
 
     pool.start(task_graph);

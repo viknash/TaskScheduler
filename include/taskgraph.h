@@ -73,7 +73,7 @@ namespace task_scheduler {
                     queue = nullptr;
                 }
             }
-            task_queue_type* task_queue[task_type::NUM_PRIORITY];
+            task_queue_type* task_queue[task_type::num_priority];
         };
 
         struct debug_container {
@@ -89,7 +89,7 @@ namespace task_scheduler {
         void load(string_type _file_name);
         void set_task_thread_affinity(task_type* _task, uint64_t _mask);
         void set_task_thread_exclusion(task_type* _task, uint64_t _mask);
-        void set_num_workers(task_type* _task, uint8_t _num_workers);
+        void set_num_workers(task_type* _task, thread_num_t _num_workers);
         void set_percentage_of_workers(task_type* _task, float _percentage_workers);
         void setup_tail_kickers();
         void depth_first_visitor(task_type* _task,
@@ -100,7 +100,7 @@ namespace task_scheduler {
             bool _bottom_up = false);
         void kick();
 
-        void queue_task(task_type* _task, uint8_t _num_threads_to_wake_up = 1);
+        void queue_task(task_type* _task, thread_num_t _num_threads_to_wake_up = 1);
         task_type* dequeue_task(uint32_t _priority);
         bool is_task_available();
         bool link_task(task_type* _parent_task, task_type* _dependent_task);
@@ -307,10 +307,10 @@ namespace task_scheduler {
 
     template <class TMemInterface>
     void base_task_graph<TMemInterface>::set_task_thread_affinity(task_type* _task,
-        uint64_t _mask)
+        thread_mask_int_t _mask)
     {
         _task->persistent.thread_affinity = 0;
-        uint64_t valid_thread_mask = 1ull << pool.num_threads;
+        thread_mask_int_t valid_thread_mask = 1ull << pool.num_threads;
         valid_thread_mask = valid_thread_mask - 1;
         while (_mask) {
             _task->persistent.thread_affinity |= _mask & valid_thread_mask;
@@ -320,10 +320,10 @@ namespace task_scheduler {
 
     template <class TMemInterface>
     void base_task_graph<TMemInterface>::set_task_thread_exclusion(task_type* _task,
-        uint64_t _mask)
+        thread_mask_int_t _mask)
     {
         _mask = ~_mask;
-        uint64_t valid_thread_mask = 1ull << pool.num_threads;
+        thread_mask_int_t valid_thread_mask = 1ull << pool.num_threads;
         valid_thread_mask = valid_thread_mask - 1;
         _mask = _mask & valid_thread_mask;
         set_task_thread_affinity(_task, _mask);
@@ -331,7 +331,7 @@ namespace task_scheduler {
 
     template <class TMemInterface>
     void base_task_graph<TMemInterface>::set_num_workers(task_type* _task,
-        uint8_t _num_workers)
+        thread_num_t _num_workers)
     {
         _task->persistent.num_workers = min(pool.num_threads, _num_workers);
     }
@@ -442,7 +442,7 @@ namespace task_scheduler {
             break;
         case TaskPriority: {
             transform(_str.begin(), _str.end(), _str.begin(), ::toupper);
-            for (auto i = 0; i < task_type::NUM_PRIORITY; i++) {
+            for (auto i = 0; i < task_type::num_priority; i++) {
                 if (_str.compare(_task->debug.priority_to_string(task_type::priority_selector(i))) == 0) {
                     _task->persistent.task_priority = task_type::priority_selector(i);
                 }
@@ -466,12 +466,12 @@ namespace task_scheduler {
 
     template <class TMemInterface>
     void base_task_graph<TMemInterface>::queue_task(task_type* _task,
-        uint8_t _num_threads_to_wake_up)
+        thread_num_t _num_threads_to_wake_up)
     {
         uint32_t priority = _task->persistent.task_priority;
         do {
-        } while (!transient.task_queue[priority]->push_back(_task) && ++priority < task_type::NUM_PRIORITY);
-        assert(priority < task_type::NUM_PRIORITY);
+        } while (!transient.task_queue[priority]->push_back(_task) && ++priority < task_type::num_priority);
+        assert(priority < task_type::num_priority);
 
         pool.wake_up(_num_threads_to_wake_up);
     }

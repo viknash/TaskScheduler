@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "meta.h"
+#include "print.h"
 #include "memory.h"
 #include "types.h"
 
@@ -32,6 +33,7 @@ namespace task_scheduler {
         typedef std::function<void()> function_type;
         typedef typename int64_t rank_type;
         typedef std::vector<function_type> task_work_vector;
+        typedef typename thread_index_t<TMemInterface> thread_index_type;
 
         typedef lock_free_node_dispenser<typename function_type*, TMemInterface>
             work_memory_allocator_type;
@@ -42,11 +44,11 @@ namespace task_scheduler {
             work_queue_type;
 
         enum priority_selector {
-            REALTIME,
-            HIGH,
-            NORMAL,
-            LOW,
-            NUM_PRIORITY
+            realtime,
+            high,
+            normal,
+            low,
+            num_priority
         };
 
         struct debug_container {
@@ -80,9 +82,9 @@ namespace task_scheduler {
             task_work_vector task_work;
         };
 
-        void set_thread_affinity(uint64_t mask);
-        void set_thread_exclusion(uint64_t mask);
-        void set_num_workers(uint8_t _num_workers);
+        void set_thread_affinity(thread_mask_int_t _mask);
+        void set_thread_exclusion(thread_mask_int_t _mask);
+        void set_num_workers(thread_num_t _num_workers);
         void set_num_workers(percentage_t _percentage_workers);
         base_task(task_graph_type& _task_graph);
         ~base_task();
@@ -115,7 +117,7 @@ namespace task_scheduler {
 
     template <class TMemInterface>
     base_task<TMemInterface>::persistent_container::persistent_container()
-        : task_priority(NORMAL)
+        : task_priority(normal)
         , sub_graph(nullptr)
         , rank(0)
         , thread_affinity(0)
@@ -156,19 +158,19 @@ namespace task_scheduler {
     }
 
     template <class TMemInterface>
-    void base_task<TMemInterface>::set_thread_affinity(uint64_t _mask)
+    void base_task<TMemInterface>::set_thread_affinity(thread_mask_int_t _mask)
     {
         task_graph.set_task_thread_affinity(this, _mask);
     }
 
     template <class TMemInterface>
-    void base_task<TMemInterface>::set_thread_exclusion(uint64_t _mask)
+    void base_task<TMemInterface>::set_thread_exclusion(thread_mask_int_t _mask)
     {
         task_graph.set_task_thread_exclusion(this, _mask);
     }
 
     template <class TMemInterface>
-    void base_task<TMemInterface>::set_num_workers(uint8_t _num_workers)
+    void base_task<TMemInterface>::set_num_workers(thread_num_t _num_workers)
     {
         task_graph.set_num_workers(this, _num_workers);
     }
@@ -210,20 +212,19 @@ namespace task_scheduler {
         //i.e. all parent tasks have been executed
 
         //If we are scheduling many tasks at once search for the next best ranked queue, starting from just after the queue that was just scheduled
-        reduce_starvation(new_search_index) uint32_t best_search_index = task_graph.pool.current_thread->thread_index;
+        reduce_starvation(new_search_index) thread_index_type best_search_index = task_graph.pool.current_thread->thread_index;
 
         for (auto dependent_task : persistent.dependent_tasks) {
             if (--dependent_task->transient.start_gate == 0) {
                 //Find lowest ranking queue, aka best queue and increment its rank with dependent task rank
-                uint32_t current_thread_index = 0;
                 thread_type* best_thread = nullptr;
                 rank_type best_rank = std::numeric_limits<rank_type>::max();
                 do {
                     best_thread = nullptr;
                     best_rank = std::numeric_limits<rank_type>::max();
-                    reduce_starvation(new_search_index) current_thread_index = best_search_index;
-                    while ((current_thread_index = (current_thread_index + 1) % task_graph.pool.num_threads) != best_search_index) {
-                        if (!(dependent_task->persistent.thread_affinity & 1ull << current_thread_index))
+                    reduce_starvation(new_search_index) thread_index_type current_thread_index = best_search_index;
+                    while (++current_thread_index != best_search_index) {
+                        if (!(dependent_task->persistent.thread_affinity & current_thread_index.get_mask()))
                             continue; //Skip threads the task should not run on
 
                         int64_t current_thread_rank = task_graph.pool.queue_rank[dependent_task->persistent.task_priority][current_thread_index].load();
@@ -237,9 +238,10 @@ namespace task_scheduler {
                 //Push task into the best queue
                 uint32_t dependent_task_priority = dependent_task->persistent.task_priority;
                 do {
-                } while (!best_thread->task_queue[dependent_task_priority]->push_back(dependent_task) && ++dependent_task_priority < task_type::NUM_PRIORITY);
-                assert(dependent_task_priority < task_type::NUM_PRIORITY);
+                } while (!best_thread->task_queue[dependent_task_priority]->push_back(dependent_task) && ++dependent_task_priority < task_type::num_priority);
+                assert(dependent_task_priority < task_type::num_priority);
 
+                ts_print("schedule " << dependent_task->debug.task_name << " -> " << uint32_t(best_thread->thread_index));
                 //Wake up thread if its sleeping
                 best_thread->wake_up();
 

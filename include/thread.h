@@ -3,6 +3,8 @@
 #include <condition_variable>
 #include <iomanip>
 
+#include "globals.h"
+#include "print.h"
 #include "profile.h"
 #include "containers.h"
 
@@ -12,127 +14,18 @@ namespace task_scheduler {
     template <class TMemInterface> class base_task_graph;
     template <class TMemInterface> class base_thread_pool;
 
-    typedef uint8_t thread_index_int_t;
-    typedef uint64_t thread_mask_int_t;
-
-    template<typename ValueType, class TMemInterface>
-    class base_thread_index
-    {
-        typedef typename base_thread_pool<TMemInterface> thread_pool;
-
-    public:
-        base_thread_index(thread_pool* _pool, ValueType _value) :
-            pool(*_pool),
-            value(_value)
-        {
-        }
-
-        base_thread_index& operator++()
-        {
-            *this += 1;
-            return *this;
-        }
-
-        base_thread_index& operator--()
-        {
-            *this -= 1;
-            return *this;
-        }
-
-        base_thread_index& operator+=(const base_thread_index& rhs)
-        {
-            value = (value + rhs) % pool.num_threads;
-            return *this;
-        }
-
-        friend base_thread_index operator+(base_thread_index lhs, const base_thread_index& rhs)
-        {
-            lhs += rhs;
-            return lhs;
-        }
-
-        base_thread_index& operator-=(const base_thread_index& rhs)
-        {
-            value = (value + pool.num_threads - rhs) % pool.num_threads;
-            return *this;
-        }
-
-        base_thread_index& operator-=(int32_t rhs)
-        {
-            value = (value + pool.num_threads - rhs) % pool.num_threads;
-            return *this;
-        }
-
-        operator const ValueType()
-        {
-            return value;
-        }
-
-        thread_mask_int_t get_mask()
-        {
-            return 1ull << value;
-        }
-
-    private:
-        ValueType value;
-        thread_pool& pool;
-    };
-   
-    template<typename ValueType, class TMemInterface>
-    inline base_thread_index<ValueType, TMemInterface> operator+(base_thread_index<ValueType, TMemInterface> lhs, const base_thread_index<ValueType, TMemInterface>& rhs)
-    {
-        lhs += rhs;
-        return lhs;
-    }
-
-    template<typename ValueType, class TMemInterface>
-    inline base_thread_index<ValueType, TMemInterface> operator+(base_thread_index<ValueType, TMemInterface> lhs, int32_t rhs)
-    {
-        lhs += rhs;
-        return lhs;
-    }
-
-    template<typename ValueType, class TMemInterface>
-    inline base_thread_index<ValueType, TMemInterface> operator+(int32_t lhs, const base_thread_index<ValueType, TMemInterface>& rhs)
-    {
-        return rhs + lhs;
-    }
-
-    template<typename ValueType, class TMemInterface>
-    inline base_thread_index<ValueType,TMemInterface> operator-(base_thread_index<ValueType, TMemInterface> lhs, const base_thread_index<ValueType, TMemInterface>& rhs)
-    {
-        lhs -= rhs;
-        return lhs;
-    }
-    
-    template<typename ValueType, class TMemInterface>
-    inline base_thread_index<ValueType, TMemInterface> operator-(base_thread_index<ValueType, TMemInterface> lhs, int32_t rhs)
-    {
-        lhs -= rhs;
-        return lhs;
-    }
-
-    template<typename ValueType, class TMemInterface>
-    inline base_thread_index<ValueType, TMemInterface> operator-(int32_t lhs, const base_thread_index<ValueType, TMemInterface>& rhs)
-    {
-        return rhs - lhs;
-    }
-
-    template<class TMemInterface>
-    using thread_index_t = base_thread_index<thread_index_int_t, TMemInterface>;
-
     template <class TMemInterface>
     struct base_thread : public TMemInterface
     {
         typedef typename base_task_graph<TMemInterface> task_graph_type;
-        typedef typename task_graph_type::task_type task_type;
+        typedef typename base_task<TMemInterface>::task_type task_type;
         typedef typename task_graph_type::task_queue_type task_queue_type;
         typedef typename base_thread<TMemInterface> thread_type;
         typedef typename base_thread_pool<TMemInterface> thread_pool;
         typedef typename task_graph_type::task_memory_allocator_type task_memory_allocator_type;
         typedef typename thread_index_t<TMemInterface> thread_index_type;
 
-        base_thread(uint8_t _thread_index, thread_pool* _pool);
+        base_thread(thread_num_t _thread_index, thread_pool* _pool);
         ~base_thread();
 
         static thread_type* create_thread(thread_pool* _pool);
@@ -141,7 +34,7 @@ namespace task_scheduler {
         void wake_up();
         void join();
 
-        task_queue_type*  task_queue[task_type::NUM_PRIORITY];
+        task_queue_type*  task_queue[task_type::num_priority];
         thread_index_type thread_index;
         std::thread::id  thread_id;
         std::thread      task_thread;
@@ -161,7 +54,7 @@ namespace task_scheduler {
     };
 
     template <class TMemInterface>
-    base_thread<TMemInterface>::base_thread(uint8_t _thread_index, thread_pool* _pool) :
+    base_thread<TMemInterface>::base_thread(thread_num_t _thread_index, thread_pool* _pool) :
         thread_index(_pool, _thread_index),
         pool(*_pool)
     {
@@ -189,7 +82,7 @@ namespace task_scheduler {
     template <class TMemInterface>
     base_thread<TMemInterface>* base_thread<TMemInterface>::create_thread(thread_pool* _pool)
     {
-        static uint8_t next_thread_num = 0;
+        static thread_num_t next_thread_num = 0;
         return new thread_type(next_thread_num++, _pool);
     }
 
@@ -198,6 +91,9 @@ namespace task_scheduler {
     {
         thread_id = std::this_thread::get_id();
         pool.current_thread = this;
+        std::ostringstream stringStream;
+        stringStream << uint32_t(thread_index);
+        thread_name = stringStream.str();
 
         // Signal thread_type has started
         --pool.setup.thread_sync;
@@ -214,7 +110,9 @@ namespace task_scheduler {
         unique_lock<mutex> signal_lock(signal);
         while (!(this->*_wake_up)() && pool.setup.request_exit != thread_pool::request_stop)
         {
-            radio.wait(signal_lock);
+            ts_print("sleep");
+            radio.wait(signal_lock); 
+            ts_print("awake");
         }
     }
 
@@ -250,7 +148,7 @@ namespace task_scheduler {
     {
         profile_time scheduling(0ms), sleeping(0ms), working(0ms);
 
-        std::cout << "Starting thread_type " << uint32_t(thread_index) << std::endl;
+        ts_print("start");
 
         while (pool.setup.request_exit != thread_pool::request_stop)
         {
@@ -266,7 +164,7 @@ namespace task_scheduler {
                 while(instrument<bool, task_type, bool(task_type::*)()>(task_time, run_task, &task_type::operator())) {};
                 --run_task->transient.num_working;
                 --pool.num_working;
-                std::cout << "thread_type(" << uint32_t(thread_index) << "), task_type " << run_task->debug.task_name << "(" << chrono::duration_cast<chrono::milliseconds>(task_time).count() << "ms)" << std::endl;
+                ts_print("run " << run_task->debug.task_name << "(" << chrono::duration_cast<chrono::milliseconds>(task_time).count() << "ms)");
                 working += task_time;
 
                 if (run_task->transient.num_working == 0)
@@ -290,14 +188,14 @@ namespace task_scheduler {
         auto sleeping_ms = chrono::duration_cast<chrono::milliseconds>(sleeping);
         auto working_ms = chrono::duration_cast<chrono::milliseconds>(working);
         auto scheduling_ratio = double(working.count() / (scheduling.count() == 0 ? 1 : scheduling.count()));
-        std::cout << "thread_type " << uint32_t(thread_index) << " Complete, Scheduling Overhead=" << scheduling_ms.count() << "ms, sleep Time=" << sleeping_ms.count() << "ms, Work Time=" << working_ms.count() << "ms, Work/Schedule Ratio=" << fixed << setprecision(0) << scheduling_ratio << std::endl;
+        ts_print("Complete, Scheduling Overhead=" << scheduling_ms.count() << "ms, sleep Time=" << sleeping_ms.count() << "ms, Work Time=" << working_ms.count() << "ms, Work/Schedule Ratio=" << fixed << setprecision(0) << scheduling_ratio);
     }
 
     template <class TMemInterface>
     typename base_thread<TMemInterface>::task_type* base_thread<TMemInterface>::get_task()
     {
         task_type *next_task = nullptr;
-        for (uint32_t priority = 0; priority < task_type::NUM_PRIORITY; priority++)
+        for (uint32_t priority = 0; priority < task_type::num_priority; priority++)
         {
             //Try to get a task from the thread queue
             if (task_queue[priority]->pop_front(next_task))
@@ -319,30 +217,31 @@ namespace task_scheduler {
             thread_index_type current_thread_index = thread_index - 1;
             do {
                 task_type *stolen_task = nullptr;
-                task_queue_type temporary_queue(&(pool.threads[current_thread_index]->allocator));
+                std::vector<task_type*> temporary_queue;
                 bool touched_thread = false;
                 do {
                     if (pool.threads[current_thread_index]->task_queue[priority]->pop_front(stolen_task))
                     {
+                        touched_thread = true;
                         if (stolen_task->persistent.thread_affinity & current_thread_index.get_mask())
                         {
                             //Steal task
                             next_task = stolen_task;
+                            ts_print("stole " << next_task->debug.task_name << " <- " << uint32_t(current_thread_index));
                             break;
                         }
                         else
                         {
-                            //Over steal
+                            //Steal wrong task
                             temporary_queue.push_back(stolen_task);
                         }
-                        touched_thread = true;
                     }
                 } while (!pool.threads[current_thread_index]->task_queue[priority]->empty());
 
-                while (!temporary_queue.empty())
+                for (auto task_ptr : temporary_queue)
                 {
                     //Return tasks
-                    pool.threads[current_thread_index]->task_queue[priority]->push_back(stolen_task);
+                    pool.threads[current_thread_index]->task_queue[priority]->push_back(task_ptr);
                 }
 
                 //We have to wakeup the thread as long as its task queue is touched
@@ -359,6 +258,11 @@ namespace task_scheduler {
 
                 --current_thread_index;
             } while (current_thread_index != thread_index);
+
+            if (next_task)
+            {
+                break;
+            }
         }
 
         return next_task;

@@ -3,26 +3,38 @@
 #include <cstdint>
 #include <thread>
 #include <atomic>
+#include <iostream>
+#include <sstream>
+#include <mutex>
 
-#if defined(_DEBUG)
-#define DEBUGONLY(x) x
+#include "types.h"
+
+#if !defined(TASK_SCHEDULER_DEBUG)
+#error("TASK_SCHEDULER_DEBUG is not defined")
+#endif// !defined(TASK_SCHEDULER_DEBUG)
+
+#if defined(TASK_SCHEDULER_DEBUG)
+#define ts_debug_only(x) x
 #else
-#define DEBUGONLY(x)
+#define ts_debug_only(x)
 #endif
 
-#define unique_variable(basename) basename##__LINE__
+#define ts_join_string( arg0, arg1 ) ts_do_join( arg0, arg1 )
+#define ts_do_join( arg0, arg1 ) arg0##arg1
+
+#define ts_unique_variable(basename) ts_join_string(basename, __COUNTER__)
 
 namespace task_scheduler {
 
-    inline uint64_t CreateMask64()
+    inline thread_mask_int_t create_mask_64()
     {
         return 0;
     }
 
     template <typename T, typename... Args>
-    uint64_t CreateMask64(T first, Args... args)
+    thread_mask_int_t create_mask_64(T first, Args... args)
     {
-        return CreateMask64(args...) | 1ull << first;
+        return create_mask_64(args...) | 1ull << first;
     }
 
     template<class T>
@@ -82,4 +94,5 @@ namespace task_scheduler {
     };
 
     typedef scoped_enter_exit<unsafe_multi_threaded_access_detector<thread_unsafe_access_storage>, thread_unsafe_access_storage> thread_unsafe_access_guard;
+
 };

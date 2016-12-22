@@ -1,0 +1,20 @@
+#pragma once
+
+#if defined(_WIN32) || defined(WIN32) || defined(_WIN64) || defined(WIN64) || defined(__CYGWIN__) || defined(__MINGW32__) || defined(__BORLANDC__)
+#define ts_windows 1
+#endif
+
+#if !defined(TASK_SCHEDULER_DEBUG)
+#error("TASK_SCHEDULER_DEBUG is not defined")
+#endif// !defined(TASK_SCHEDULER_DEBUG)
+
+#if defined(TASK_SCHEDULER_DEBUG)
+#define NOMINMAX
+#include <windows.h>
+#endif
+
+#if defined(ts_windows)
+#define ts_windows_only(x) x
+#else //defined(ts_windows)
+#define ts_windows_only(x)
+#endif // defined(ts_windows)

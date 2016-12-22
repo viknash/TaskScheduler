@@ -44,28 +44,26 @@ namespace task_scheduler {
         };
 
     public:
-        base_thread_pool(uint32_t _num_threads = MAX_NUM_THREADS);
+        base_thread_pool(thread_num_t _num_threads = max_num_threads);
         void start(task_graph_type& task_graph);
         void stop();
-        void wake_up(uint8_t num_threads_to_wake_up = MAX_NUM_THREADS);
-
-        static const uint32_t MAX_NUM_THREADS = 64;
+        void wake_up(thread_num_t num_threads_to_wake_up = max_num_threads);
 
         setup_container setup;
-        uint8_t num_threads;
+        thread_num_t num_threads;
         task_graph_type* task_graph;
-        thread_type* threads[MAX_NUM_THREADS];
+        thread_type* threads[max_num_threads];
         task_memory_allocator_type task_memory_allocator;
         std::atomic<uint32_t> num_working;
 
-        optimization std::atomic<typename task_type::rank_type> queue_rank[task_type::NUM_PRIORITY][MAX_NUM_THREADS];
+        optimization std::atomic<typename task_type::rank_type> queue_rank[task_type::num_priority][max_num_threads];
 
         thread_local static thread_type* current_thread;
     };
 
     template <class TMemInterface>
-    base_thread_pool<TMemInterface>::base_thread_pool(uint32_t _num_threads)
-        : num_threads(static_cast<uint8_t>(std::min(std::min(std::thread::hardware_concurrency(), MAX_NUM_THREADS), _num_threads)))
+    base_thread_pool<TMemInterface>::base_thread_pool(thread_num_t _num_threads)
+        : num_threads(std::min(std::min(static_cast<thread_num_t>(std::thread::hardware_concurrency()), max_num_threads), _num_threads))
         , task_graph(nullptr)
     {
         memset(threads, 0, sizeof(threads));
@@ -109,7 +107,7 @@ namespace task_scheduler {
     }
 
     template <class TMemInterface>
-    void base_thread_pool<TMemInterface>::wake_up(uint8_t _num_threads_to_wake_up)
+    void base_thread_pool<TMemInterface>::wake_up(thread_num_t _num_threads_to_wake_up)
     {
         _num_threads_to_wake_up = min(num_threads, _num_threads_to_wake_up);
         reduce_starvation(always_different_thread_woken_up_first) static uint32_t next_thread_index = 0;

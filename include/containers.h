@@ -88,12 +88,12 @@ namespace task_scheduler {
         lock_free_node_stack()
         {
             head.clear();
-            DEBUGONLY(debug.counter = 0;);
+            ts_debug_only(debug.counter = 0;);
         }
 
         void push_front(node_type* _node)
         {
-            DEBUGONLY(assert(_node->next.node == nullptr););
+            ts_debug_only(assert(_node->next.node == nullptr););
             atomic_node_ptr copy, newNode;
             do {
                 copy = head;
@@ -101,7 +101,7 @@ namespace task_scheduler {
                 newNode.data.points_to.node = _node;
                 _node->next.node = head.data.points_to.node;
             } while (!head.compare_exchange_weak(copy, newNode));
-            DEBUGONLY(atomics::increment(debug.counter););
+            ts_debug_only(atomics::increment(debug.counter););
         }
 
         node_type* pop_front()
@@ -118,8 +118,8 @@ namespace task_scheduler {
 
             } while (!head.compare_exchange_weak(copy, inc_copy));
 
-            DEBUGONLY(atomics::decrement(debug.counter););
-            DEBUGONLY(copy.data.points_to.node->next.node = nullptr;);
+            ts_debug_only(atomics::decrement(debug.counter););
+            ts_debug_only(copy.data.points_to.node->next.node = nullptr;);
             return copy.data.points_to.node;
         }
 
@@ -134,7 +134,7 @@ namespace task_scheduler {
         struct debug_container {
             int32_t counter;
         };
-        DEBUGONLY(debug_container debug;);
+        ts_debug_only(debug_container debug;);
     };
 
     template <typename T, class TMemInterface = default_mem_interface>
@@ -178,7 +178,7 @@ namespace task_scheduler {
                 }
             }
 
-            DEBUGONLY(ret->next.node = nullptr;);
+            ts_debug_only(ret->next.node = nullptr;);
             return ret;
         }
 
@@ -208,7 +208,7 @@ namespace task_scheduler {
             : dispenser(_dispenser)
         {
             end_node.node = (node_type*)(this); //Magic Value for the end node
-            DEBUGONLY(debug.counter = 1);
+            ts_debug_only(debug.counter = 1);
             node_type* sentinelle = dispenser->new_node();
             head.data.points_to.node = sentinelle;
             head.data.access.as_atomic = 0;
@@ -222,7 +222,7 @@ namespace task_scheduler {
             clear();
             assert(head.data.points_to.node == tail.data.points_to.node);
             assert(head.data.points_to.node->next.node == end_node.node); // Check if list is empty
-            DEBUGONLY(head.data.points_to.node->next.node = nullptr;)
+            ts_debug_only(head.data.points_to.node->next.node = nullptr;)
                 dispenser->free_node(head.data.points_to.node);
         }
 
@@ -239,12 +239,12 @@ namespace task_scheduler {
 
             atomic_node_ptr tail_snapshot;
             tail_snapshot = tail;
-            DEBUGONLY(atomics::increment(debug.counter););
+            ts_debug_only(atomics::increment(debug.counter););
             while (end_node.as_atomic != atomics::compare_exchange_weak(tail.data.points_to.node->next.as_atomic, end_node.as_atomic, new_node.as_atomic)) {
-                DEBUGONLY(atomics::decrement(debug.counter););
+                ts_debug_only(atomics::decrement(debug.counter););
                 update_tail(tail_snapshot);
                 tail_snapshot = tail;
-                DEBUGONLY(atomics::increment(debug.counter););
+                ts_debug_only(atomics::increment(debug.counter););
             }
 
             // If the tail remains the same then update the tail
@@ -280,7 +280,7 @@ namespace task_scheduler {
                     break;
                 }
 
-                DEBUGONLY(if (!nextSnapshot) continue;);
+                ts_debug_only(if (!nextSnapshot) continue;);
                 value = nextSnapshot->load();
 
             } while (skip || !head.compare_exchange_weak(headSnapshot, headSnapshot));
@@ -365,7 +365,7 @@ namespace task_scheduler {
                     continue;
                 }
 
-                DEBUGONLY(if (!ptr_next) continue;);
+                ts_debug_only(if (!ptr_next) continue;);
                 //Save the value to be return if this try is successful
                 value = ptr_next->load();
 
@@ -383,7 +383,7 @@ namespace task_scheduler {
             //If we succeeded then return the new value the removed node
             if (ptr_head.data.points_to.node != nullptr) {
                 ptr_head.data.points_to.node->store(value);
-                DEBUGONLY(ptr_head.data.points_to.node->next.node = nullptr;);
+                ts_debug_only(ptr_head.data.points_to.node->next.node = nullptr;);
             }
 
             return ptr_head.data.points_to.node;
@@ -397,7 +397,7 @@ namespace task_scheduler {
         struct debug_container {
             volatile int32_t counter;
         };
-        DEBUGONLY(debug_container debug;);
+        ts_debug_only(debug_container debug;);
     };
 
     template <class TPolicy, class T, class TMemInterface, class TParam = void*>
@@ -504,9 +504,9 @@ namespace task_scheduler {
         {
             delete[] data;
         }
-        DEBUGONLY(data = nullptr;);
-        DEBUGONLY(array_flags = 0;);
-        DEBUGONLY(array_size = 0;);
+        ts_debug_only(data = nullptr;);
+        ts_debug_only(array_flags = 0;);
+        ts_debug_only(array_size = 0;);
     }
 
     template <typename T, class TMemInterface>
@@ -585,7 +585,7 @@ namespace task_scheduler {
     inline lock_free_batch_dispatcher<T, TDataType, TMemInterface>::~lock_free_batch_dispatcher()
     {
         data.unlock();
-        DEBUGONLY(next_batch_index = 0;);
+        ts_debug_only(next_batch_index = 0;);
     }
 
     template <typename T, class TDataType, class TMemInterface>
