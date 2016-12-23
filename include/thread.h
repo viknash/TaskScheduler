@@ -223,7 +223,7 @@ namespace task_scheduler {
                     if (pool.threads[current_thread_index]->task_queue[priority]->pop_front(stolen_task))
                     {
                         touched_thread = true;
-                        if (stolen_task->persistent.thread_affinity & current_thread_index.get_mask())
+                        if (current_thread_index.is_set(stolen_task->persistent.thread_affinity))
                         {
                             //Steal task
                             next_task = stolen_task;

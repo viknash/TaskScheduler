@@ -112,6 +112,12 @@ namespace task_scheduler {
             return 1ull << value;
         }
 
+        bool is_set(thread_mask_int_t _other_mask)
+        {
+            thread_mask_int_t this_mask = get_mask();
+            return ((this_mask & _other_mask) == this_mask);
+        }
+
     private:
         ValueType value;
         thread_pool* pool;

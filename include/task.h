@@ -224,7 +224,7 @@ namespace task_scheduler {
                     best_rank = std::numeric_limits<rank_type>::max();
                     reduce_starvation(new_search_index) thread_index_type current_thread_index = best_search_index;
                     while (++current_thread_index != best_search_index) {
-                        if (!(dependent_task->persistent.thread_affinity & current_thread_index.get_mask()))
+                        if (!current_thread_index.is_set(dependent_task->persistent.thread_affinity))
                             continue; //Skip threads the task should not run on
 
                         int64_t current_thread_rank = task_graph.pool.queue_rank[dependent_task->persistent.task_priority][current_thread_index].load();
