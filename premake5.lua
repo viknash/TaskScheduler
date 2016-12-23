@@ -4,7 +4,7 @@
         platforms { "Win64" }
         objdir "tmp"
 
-		flags { "ExtraWarnings", "StaticRuntime", "MultiProcessorCompile" }
+		flags { "ExtraWarnings", "MultiProcessorCompile" }
 
         filter { "platforms:Win64" }
             system "Windows"
@@ -69,6 +69,7 @@
 			debugdir    "tests/multi_threaded_detector"
 			pchheader   "stdafx.h"
 			pchsource   "tests/multi_threaded_detector/stdafx.cpp"
+			targetname	"multi_threaded_detector.test"
 
 			files
 			{

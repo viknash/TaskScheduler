@@ -16,18 +16,40 @@
 using namespace task_scheduler;
 using namespace std;
 
-task_scheduler_default_mem_interface_catch_all_allocations();
 task_scheduler_static_data();
 
+namespace {
+    class MultiThreadedDetectorTest : public ::testing::Test {
+    protected:
+       virtual void SetUp() {
+       }
 
-TEST(SquareRootTest, ZeroAndNegativeNos) {
-    EXPECT_EQ(0.0, 0.0);
-    EXPECT_EQ(-1, -1);
-}
+       virtual void TearDown() {
+       }
 
-int main()
+       thread_unsafe_access_storage detector;
+    };
+
+    TEST_F(MultiThreadedDetectorTest, RecursiveAccess) {
+        unsafe_multi_threaded_access_detector<thread_unsafe_access_storage> guard1, guard2;
+        EXPECT_TRUE(guard1.enter(detector));
+        EXPECT_TRUE(guard2.enter(detector));
+        EXPECT_TRUE(guard2.exit(detector));
+        EXPECT_TRUE(guard1.exit(detector));
+    }
+
+    TEST_F(MultiThreadedDetectorTest, BadRecursiveAccess) {
+        unsafe_multi_threaded_access_detector<thread_unsafe_access_storage> guard1, guard2;
+        EXPECT_TRUE(guard1.enter(detector));
+        EXPECT_TRUE(guard2.exit(detector));
+        EXPECT_TRUE(guard2.enter(detector));
+        EXPECT_TRUE(guard1.exit(detector));
+    }
+
+};
+
+int main(int argc, char **argv)
 {
-
-    system("pause");
-    return 0;
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }
