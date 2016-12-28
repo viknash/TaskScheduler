@@ -1,23 +1,39 @@
 	workspace "task_scheduler"
         editorintegration "On"
 		configurations { "release", "debug" }
-        platforms { "Win64" }
+        platforms { "Win64", "Win64-Clang", "Win64-MSClang" }
         objdir "tmp"
-
-		flags { "ExtraWarnings", "MultiProcessorCompile" }
 
         filter { "platforms:Win64" }
             system "Windows"
             architecture "x64"
+            toolset "v140"
+		    flags { "ExtraWarnings", "MultiProcessorCompile" }
+            buildoptions    { "/GR-" }
+
+        filter { "platforms:Win64-Clang" }
+            system "Windows"
+            architecture "x64"
+            toolset "msc-llvm-vs2014"
+
+        filter { "platforms:Win64-MSClang" }
+            system "Windows"
+            architecture "x64"
+            toolset "v140_clang_c2"
 
 		filter "configurations:debug"
 			defines     "_DEBUG"
-			symbols		"On"
 
 		filter "configurations:release"
 			defines     "NDEBUG"
 			optimize    "Full"
 			flags       { "NoBufferSecurityCheck", "NoRuntimeChecks" }
+
+		filter { "configurations:debug", "platforms:Win64" }
+			symbols		"On"
+
+		filter { "configurations:debug", "platforms:Win64-MSClang" }
+			buildoptions    { "-g2", "-Wall" }
 
 		filter "action:vs*"
 			defines     { "_CRT_SECURE_NO_DEPRECATE", "_CRT_SECURE_NO_WARNINGS", "_CRT_NONSTDC_NO_WARNINGS" }

@@ -1,5 +1,3 @@
-#pragma once
-
 #if defined(_DEBUG)
 #define TASK_SCHEDULER_DEBUG 1
 #else

@@ -39,7 +39,7 @@ namespace task_scheduler {
         struct setup_container {
             std::mutex signal;
             std::condition_variable radio;
-            std::atomic<uint32_t> thread_sync;
+            std::atomic_uint32_t thread_sync;
             std::atomic<state_selector> request_exit;
         };
 

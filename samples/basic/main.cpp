@@ -44,6 +44,11 @@ int main()
     task_graph_type task_graph(pool);
     task_graph.load("tasks.txt");
 
+    guarded_vector<void*, default_mem_interface> vector;
+    lock_free_batch_dispatcher<void*, guarded_vector<void*, default_mem_interface>, default_mem_interface> dispatcher(vector);
+    
+    vector.push_back(nullptr);
+
     random_device rd;
     mt19937_64 gen(rd());
     uniform_int_distribution<uint64_t> dis(0, 63);

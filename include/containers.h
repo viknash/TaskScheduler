@@ -440,7 +440,7 @@ namespace task_scheduler {
         TPolicy queue;
     };
 
-    template <typename T, class TDataStructure, class TMemInterface = default_mem_interface>
+    template <typename T, class TDataStructure, class TMemInterface>
     class guarded : private TDataStructure {
         typedef TDataStructure super;
     public:
@@ -452,26 +452,32 @@ namespace task_scheduler {
         void push_back(const T& _new_item);
         void clear();
 
+        template <typename T, class TDataType, class TMemInterface>
+        friend   class lock_free_batch_dispatcher;
+
     private:
         std::atomic_bool read_locked;
 
-        void lock();
-        void unlock();
+        void lock(T*& _locked_data);
+        void unlock(T*& _unlocked_data);
         bool is_locked();
     };
 
     template <typename T, class TDataStructure, class TMemInterface>
-    void guarded<T, TDataStructure, TMemInterface>::lock()
+    void guarded<T, TDataStructure, TMemInterface>::lock(T*& _locked_data)
     {
-        assert(read_locked); //Array has already been locked before
-        read_locked = true;
+        bool previous_value = read_locked.exchange(true);
+        assert(!previous_value); //Array has already been locked before
+        _locked_data = super::data();
     }
 
     template <typename T, class TDataStructure, class TMemInterface>
-    void guarded<T, TDataStructure, TMemInterface>::unlock()
+    void guarded<T, TDataStructure, TMemInterface>::unlock(T*& _unlocked_data)
     {
-        assert(read_locked); //Array has already been unlocked before
-        read_locked = false;
+        assert(super::data() == _unlocked_data);
+        _unlocked_data = nullptr;
+        bool previous_value = read_locked.exchange(false);
+        assert(previous_value); //Array not been locked before
     }
 
     template <typename T, class TDataStructure, class TMemInterface>
@@ -484,14 +490,20 @@ namespace task_scheduler {
     void guarded<T, TDataStructure, TMemInterface>::push_back(const T& _new_item)
     {
         assert(!is_locked()); //Array has been locked for reading
-        super::push_back(_new_item);
+        if (!is_locked())
+        {
+            super::push_back(_new_item);
+        }
     }
 
     template <typename T, class TDataStructure, class TMemInterface>
     void guarded<T, TDataStructure, TMemInterface>::clear()
     {
         assert(!is_locked()); //Array has been locked for reading
-        super::clear();
+        if (!is_locked())
+        {
+            super::clear();
+        }
     }
 
     template <typename T, class TDataStructure, class TMemInterface>
@@ -503,8 +515,8 @@ namespace task_scheduler {
     template <typename T, class TDataStructure, class TMemInterface>
     T& guarded<T, TDataStructure, TMemInterface>::at(size_t _index)
     {
-        assert(_index < size()); // Index out of bounds
-        return data() + _index;
+        assert(_index < super::size()); // Index out of bounds
+        return super::data() + _index;
     }
 
     template <typename T, class TDataStructure, class TMemInterface>
@@ -516,8 +528,8 @@ namespace task_scheduler {
     template <typename T, class TDataStructure, class TMemInterface>
     T& guarded<T, TDataStructure, TMemInterface>::back()
     {
-        assert(size() > 0);
-        return at(size() - 1);
+        assert(super::size() > 0);
+        return at(super::size() - 1);
     }
 
     template <typename T, class TMemInterface>
@@ -642,7 +654,7 @@ namespace task_scheduler {
     }
 
 
-    template <typename T, class TDataType, class TMemInterface = default_mem_interface>
+    template <typename T, class TDataType, class TMemInterface>
     class lock_free_batch_dispatcher : public TMemInterface {
     public:
         lock_free_batch_dispatcher(TDataType& _data_type);
@@ -657,28 +669,30 @@ namespace task_scheduler {
 
 
     template <typename T, class TDataType, class TMemInterface>
-    inline lock_free_batch_dispatcher<T, TDataType, TMemInterface>::lock_free_batch_dispatcher(TDataType& _guarded_write_array) :
-        data(_guarded_write_array),
+    lock_free_batch_dispatcher<T, TDataType, TMemInterface>::lock_free_batch_dispatcher(TDataType& _guarded_data_structure) :
+        data(_guarded_data_structure),
+        locked_data(nullptr),
         next_batch_index(0)
     {
         data.lock(locked_data);
     }
 
     template <typename T, class TDataType, class TMemInterface>
-    inline lock_free_batch_dispatcher<T, TDataType, TMemInterface>::~lock_free_batch_dispatcher()
+    lock_free_batch_dispatcher<T, TDataType, TMemInterface>::~lock_free_batch_dispatcher()
     {
         data.unlock(locked_data);
         ts_debug_only(next_batch_index = 0;);
     }
 
     template <typename T, class TDataType, class TMemInterface>
-    inline T* lock_free_batch_dispatcher<T, TDataType, TMemInterface>::get_next_batch(size_t _requested_batch_size, size_t& _returned_batch_size)
+    T* lock_free_batch_dispatcher<T, TDataType, TMemInterface>::get_next_batch(size_t _requested_batch_size, size_t& _returned_batch_size)
     {
+        assert(locked_data); //Data has been accessed without locking
         size_t current_batch_index = next_batch_index.fetch_add(_requested_batch_size);
         if (current_batch_index < data.array_size)
         {
             _returned_batch_size = std::min(data.array_size - current_batch_index, _requested_batch_size);
-            return data() + current_batch_index;
+            return locked_data + current_batch_index;
         }
         else
         {

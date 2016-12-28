@@ -1,3 +1,6 @@
 [submodule "deps/IntelSEAPI"]
 	path = deps/IntelSEAPI
 	url = https://github.com/01org/IntelSEAPI.git
+[submodule "helpers/PremakeExtension"]
+	path = helpers/PremakeExtension
+	url = https://github.com/tvandijck/PremakeExtension
