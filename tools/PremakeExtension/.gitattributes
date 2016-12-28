@@ -1,0 +1,2 @@
+extension.vsixmanifest filter=lfs diff=lfs merge=lfs -text
+PremakeExtension.pkgdef filter=lfs diff=lfs merge=lfs -text
