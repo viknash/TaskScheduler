@@ -20,9 +20,12 @@
             system "Windows"
             architecture "x64"
             toolset "v140_clang_c2"
+            buildoptions    { "-frtti", "-fms-compatibility" }
 
 		filter "configurations:debug"
 			defines     "_DEBUG"
+            links { "MSVCRTD.LIB" }
+            linkoptions { "/NODEFAULTLIB:msvcrt" }
 
 		filter "configurations:release"
 			defines     "NDEBUG"
@@ -48,7 +51,7 @@
 			language    "C++"
 			kind        "ConsoleApp"
 			location    "samples/basic"
-			includedirs { "samples/basic", "include" }
+			includedirs { "samples/basic", "include", "samples" }
 			debugdir    "samples/basic"
 			pchheader   "stdafx.h"
 			pchsource   "samples/basic/stdafx.cpp"
@@ -57,7 +60,8 @@
 			{
 				"*.txt", "**.lua","**.md",
 				"samples/basic/**.h", "samples/basic/**.cpp",
-				"include/*.h"
+				"include/*.h",
+                "samples/common/**.h", "samples/common/**.cpp"
 			}
 
 			excludes

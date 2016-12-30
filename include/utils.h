@@ -86,12 +86,12 @@ namespace task_scheduler {
         scoped_enter_exit(TParam& _param) :
             param(_param)
         {
-            enter(param);
+            this->enter(param);
         }
 
         ~scoped_enter_exit()
         {
-            exit(param);
+            this->exit(param);
         }
 
     private:

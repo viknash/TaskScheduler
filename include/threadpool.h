@@ -8,6 +8,7 @@
 #include "containers.h"
 #include "meta.h"
 #include "profile.h"
+#include "globals.h"
 
 namespace task_scheduler {
 
@@ -22,12 +23,13 @@ namespace task_scheduler {
 
     template <class TMemInterface>
     class base_thread_pool {
-        typedef typename base_thread<TMemInterface> thread_type;
-        typedef typename base_task_graph<TMemInterface> task_graph_type;
+        typedef base_thread<TMemInterface> thread_type;
+        typedef base_task_graph<TMemInterface> task_graph_type;
+        typedef base_thread_pool<TMemInterface> thread_pool;
         typedef typename task_graph_type::task_type task_type;
         typedef typename task_graph_type::task_queue_type task_queue_type;
         typedef typename task_graph_type::task_memory_allocator_type task_memory_allocator_type;
-        typedef typename base_thread_pool<TMemInterface> thread_pool;
+        typedef typename thread_type::thread_index_type thread_index_type;
 
     public:
         enum state_selector {
@@ -66,6 +68,13 @@ namespace task_scheduler {
         , task_graph(nullptr)
     {
         memset(threads, 0, sizeof(threads));
+        for(auto& priority_queue : queue_rank)
+        {
+            for (auto& rank : priority_queue)
+            {
+                rank.store(0);
+            }
+        }
     }
 
     template <class TMemInterface>
@@ -80,7 +89,7 @@ namespace task_scheduler {
 
         //Wait until all threads are started
         while (setup.thread_sync != 0) {
-            unique_lock<mutex> signal(setup.signal);
+            std::unique_lock<std::mutex> signal(setup.signal);
             setup.radio.wait(signal);
         }
 
@@ -108,18 +117,18 @@ namespace task_scheduler {
     template <class TMemInterface>
     void base_thread_pool<TMemInterface>::wake_up(thread_num_t _num_threads_to_wake_up)
     {
-        _num_threads_to_wake_up = min(num_threads, _num_threads_to_wake_up);
-        reduce_starvation(always_different_thread_woken_up_first) static uint32_t next_thread_index = 0;
-        for (uint32_t thread_idx = next_thread_index, iterations = 0; iterations < _num_threads_to_wake_up; thread_idx = (thread_idx + 1) % num_threads, iterations++) {
-            threads[thread_idx]->wake_up();
+        _num_threads_to_wake_up = std::min(num_threads, _num_threads_to_wake_up);
+        reduce_starvation(always_different_thread_woken_up_first) static thread_index_type next_thread_index(this,0);
+        for (uint32_t iterations = 0; iterations < _num_threads_to_wake_up; ++next_thread_index, ++iterations) {
+            threads[next_thread_index]->wake_up();
         }
-        reduce_starvation(always_different_thread_woken_up_first) next_thread_index = (next_thread_index + 1) % num_threads;
+        reduce_starvation(always_different_thread_woken_up_first) ++next_thread_index;
     }
 
     template <class TMemInterface>
     typename base_thread_pool<TMemInterface>::thread_type* base_thread_pool<TMemInterface>::get_current_thread()
     {
-        return ::get_current_thread<thread_type>();
+        return task_scheduler::get_current_thread<typename thread_pool::thread_type>();
     }
 
 };

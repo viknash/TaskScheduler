@@ -1,11 +1,13 @@
 #pragma once
 
+#include <istream>
+#include <atomic>
+
 #include "memory.h"
 #include "utils.h"
 #include "atomics.h"
-
-#include <istream>
-#include <atomic>
+#include "cache.h"
+#include "print.h"
 
 namespace task_scheduler {
 
@@ -174,7 +176,7 @@ namespace task_scheduler {
                     ret = new node_type();
                 }
                 else {
-                    std::cout << "Insufficient number of pre-allocated Nodes" << std::endl;
+                    ts_print("Insufficient number of pre-allocated Nodes");
                 }
             }
 
@@ -444,7 +446,7 @@ namespace task_scheduler {
     class guarded : private TDataStructure {
         typedef TDataStructure super;
     public:
-
+        guarded();
         T& operator[](size_t _index);
         T& at(size_t _index);
         T& front();
@@ -464,10 +466,17 @@ namespace task_scheduler {
     };
 
     template <typename T, class TDataStructure, class TMemInterface>
+    guarded<T, TDataStructure, TMemInterface>::guarded() :
+        read_locked(false)
+    {
+        
+    }
+
+    template <typename T, class TDataStructure, class TMemInterface>
     void guarded<T, TDataStructure, TMemInterface>::lock(T*& _locked_data)
     {
         bool previous_value = read_locked.exchange(true);
-        assert(!previous_value); //Array has already been locked before
+        assert(!previous_value); (void)previous_value;//Array has already been locked before
         _locked_data = super::data();
     }
 
@@ -477,7 +486,7 @@ namespace task_scheduler {
         assert(super::data() == _unlocked_data);
         _unlocked_data = nullptr;
         bool previous_value = read_locked.exchange(false);
-        assert(previous_value); //Array not been locked before
+        assert(previous_value);  (void)previous_value;//Array not been locked before
     }
 
     template <typename T, class TDataStructure, class TMemInterface>
@@ -574,12 +583,11 @@ namespace task_scheduler {
         flags(0)
     {
         array_flags.reserved_size = ~0;
-        uint64_t max_array_size = array_flags.reserved_size;
         assert(_reserved_size < array_flags.reserved_size); // Requested size is too large
         array_flags.reserved_size = _reserved_size;
         array_flags.data_owner = 1;
         uint32_t cache_line_size = _optimize_for_cache_line_size ? get_cache_line_size() : 1;
-        data = new (cache_line_size) T[size];
+        data = new (cache_line_size) T[array_size];
     }
 
     template <typename T, class TMemInterface>

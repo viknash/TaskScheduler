@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <vector>
+#include <cinttypes>
 
 #include "meta.h"
 #include "print.h"
@@ -31,15 +32,15 @@ namespace task_scheduler {
         typedef std::vector<task_type*, stl_allocator<task_type*, TMemInterface>> task_vector;
         typedef base_thread_pool<TMemInterface> thread_pool;
         typedef std::function<void()> function_type;
-        typedef typename int64_t rank_type;
+        typedef int64_t rank_type;
         typedef std::vector<function_type> task_work_vector;
-        typedef typename thread_index_t<TMemInterface> thread_index_type;
+        typedef thread_index_t<TMemInterface> thread_index_type;
 
-        typedef lock_free_node_dispenser<typename function_type*, TMemInterface>
+        typedef lock_free_node_dispenser<function_type*, TMemInterface>
             work_memory_allocator_type;
-        typedef typename lock_free_queue<multi_producer_multi_consumer<typename function_type*,
+        typedef lock_free_queue<multi_producer_multi_consumer<function_type*,
             TMemInterface, work_memory_allocator_type>,
-            typename function_type*, TMemInterface,
+            function_type*, TMemInterface,
             work_memory_allocator_type*>
             work_queue_type;
 
@@ -222,8 +223,8 @@ namespace task_scheduler {
                 do {
                     best_thread = nullptr;
                     best_rank = std::numeric_limits<rank_type>::max();
-                    reduce_starvation(new_search_index) thread_index_type current_thread_index = best_search_index;
-                    while (++current_thread_index != best_search_index) {
+                    thread_index_type current_thread_index = best_search_index;
+                    for (thread_num_t iterations = 0; iterations < task_graph.pool.num_threads; ++current_thread_index, ++iterations) {
                         if (!current_thread_index.is_set(dependent_task->persistent.thread_affinity))
                             continue; //Skip threads the task should not run on
 
@@ -265,11 +266,11 @@ namespace task_scheduler {
         bool initializedSubGraph = false;
         for (auto kick_task : persistent.kick_tasks) {
             if (!initializedSubGraph) {
-                task_graph.initialize(kick_task->persistent.sub_graph);
+                task_graph.setup(kick_task->persistent.sub_graph);
                 initializedSubGraph = true;
             }
             uint64_t start_gate = kick_task->transient.start_gate.load();
-            assert(start_gate == 0); start_gate;
+            assert(start_gate == 0); (void)start_gate;
             task_graph.queue_task(kick_task);
         }
     }

@@ -2,12 +2,7 @@
 
 #include <cstdint>
 
-#if defined(_MSC_VER)
-#if !defined(NOMINMAX)
-#define NOMINMAX
-#endif //!defined(NOMINMAX)
-#include <windows.h>
-#endif
+#include "platform.h"
 
 namespace task_scheduler {
 

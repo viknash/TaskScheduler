@@ -104,8 +104,8 @@ namespace task_scheduler {
 #define task_scheduler_default_mem_interface_catch_all_allocations() \
     default_mem_interface gDefaultMemInterface; \
     void* operator new(size_t n){return gDefaultMemInterface.operator new(n);} \
-    void operator delete(void* p, size_t n){gDefaultMemInterface.operator delete(p, n);} \
+    void operator delete(void* p, size_t n) throw() {gDefaultMemInterface.operator delete(p, n);} \
     void* operator new[](size_t n){return gDefaultMemInterface.operator new[](n);} \
-    void operator delete[](void* p, size_t n){gDefaultMemInterface.operator delete[](p, n);}
+    void operator delete[](void* p, size_t n) throw() {gDefaultMemInterface.operator delete[](p, n);}
 
 };

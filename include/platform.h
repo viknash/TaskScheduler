@@ -8,8 +8,12 @@
 #error("TASK_SCHEDULER_DEBUG is not defined")
 #endif// !defined(TASK_SCHEDULER_DEBUG)
 
-#if defined(TASK_SCHEDULER_DEBUG)
+#if defined(ts_windows)
+#if !defined(NOMINMAX)
 #define NOMINMAX
+#endif //!defined(NOMINMAX)
+struct IUnknown;
+#include <Unknwnbase.h>
 #include <windows.h>
 #endif
 

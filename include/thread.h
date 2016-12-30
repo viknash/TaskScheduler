@@ -17,13 +17,13 @@ namespace task_scheduler {
     template <class TMemInterface>
     struct base_thread : public TMemInterface
     {
-        typedef typename base_task_graph<TMemInterface> task_graph_type;
+        typedef base_task_graph<TMemInterface> task_graph_type;
         typedef typename base_task<TMemInterface>::task_type task_type;
         typedef typename task_graph_type::task_queue_type task_queue_type;
-        typedef typename base_thread<TMemInterface> thread_type;
-        typedef typename base_thread_pool<TMemInterface> thread_pool;
+        typedef base_thread<TMemInterface> thread_type;
+        typedef base_thread_pool<TMemInterface> thread_pool;
         typedef typename task_graph_type::task_memory_allocator_type task_memory_allocator_type;
-        typedef typename thread_index_t<TMemInterface> thread_index_type;
+        typedef thread_index_t<TMemInterface> thread_index_type;
 
         base_thread(thread_num_t _thread_index, thread_pool* _pool);
         ~base_thread();
@@ -100,14 +100,14 @@ namespace task_scheduler {
         pool.setup.radio.notify_one();
 
         //wake_up when all threads have started
-        unique_lock<mutex> signalLock(signal);
+        std::unique_lock<std::mutex> signalLock(signal);
         radio.wait(signalLock);
     }
 
     template <class TMemInterface>
     void base_thread<TMemInterface>::sleep(bool (thread_type::*_wake_up)())
     {
-        unique_lock<mutex> signal_lock(signal);
+        std::unique_lock<std::mutex> signal_lock(signal);
         while (!(this->*_wake_up)() && pool.setup.request_exit != thread_pool::request_stop)
         {
             ts_print("sleep");
@@ -119,7 +119,7 @@ namespace task_scheduler {
     template <class TMemInterface>
     void base_thread<TMemInterface>::wake_up()
     {
-        unique_lock<mutex> signal_lock(signal);
+        std::unique_lock<std::mutex> signal_lock(signal);
         radio.notify_one();
     }
 
@@ -146,6 +146,7 @@ namespace task_scheduler {
     template <class TMemInterface>
     void base_thread<TMemInterface>::run()
     {
+        using namespace std;
         profile_time scheduling(0ms), sleeping(0ms), working(0ms);
 
         ts_print("start");
@@ -184,9 +185,9 @@ namespace task_scheduler {
 
         assert(!is_task_available());
 
-        auto scheduling_ms = chrono::duration_cast<chrono::milliseconds>(scheduling);
-        auto sleeping_ms = chrono::duration_cast<chrono::milliseconds>(sleeping);
-        auto working_ms = chrono::duration_cast<chrono::milliseconds>(working);
+        auto scheduling_ms = std::chrono::duration_cast<std::chrono::milliseconds>(scheduling);
+        auto sleeping_ms = std::chrono::duration_cast<std::chrono::milliseconds>(sleeping);
+        auto working_ms = std::chrono::duration_cast<std::chrono::milliseconds>(working);
         auto scheduling_ratio = double(working.count() / (scheduling.count() == 0 ? 1 : scheduling.count()));
         ts_print("Complete, Scheduling Overhead=" << scheduling_ms.count() << "ms, sleep Time=" << sleeping_ms.count() << "ms, Work Time=" << working_ms.count() << "ms, Work/Schedule Ratio=" << fixed << setprecision(0) << scheduling_ratio);
     }

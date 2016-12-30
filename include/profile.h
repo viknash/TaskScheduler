@@ -31,7 +31,7 @@ namespace task_scheduler {
             TMemFunc _func, TArgs... _params)
     {
         profile_timer profile(_profileTime);
-        return (_classType->*_func)(forward<TArgs>(_params)...);
+        return (_classType->*_func)(std::forward<TArgs>(_params)...);
     }
 
 };

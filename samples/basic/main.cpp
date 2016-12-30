@@ -1,7 +1,10 @@
 #include "stdafx.h"
 
+#include "platform.h"
 #include <algorithm>
 #include <random>
+#include <cinttypes>
+
 
 #include "containers.h"
 #include "profile.h"
@@ -10,6 +13,8 @@
 #include "thread.h"
 #include "threadpool.h"
 #include "utils.h"
+
+#include "common/taskgraphhelper.h"
 
 using namespace task_scheduler;
 using namespace std;
@@ -38,15 +43,18 @@ void RandomTimeTask(chrono::milliseconds minTaskTime, chrono::milliseconds maxTa
 int main()
 {
     typedef base_task_graph<default_mem_interface> task_graph_type;
+    typedef base_task_graph_helper<default_mem_interface> task_graph_helper_type;
     typedef base_thread_pool<default_mem_interface> thread_pool;
 
     thread_pool pool(128);
     task_graph_type task_graph(pool);
-    task_graph.load("tasks.txt");
+    task_graph_helper_type task_graph_helper(task_graph);
+    task_graph_helper.load("tasks.txt");
 
     guarded_vector<void*, default_mem_interface> vector;
-    lock_free_batch_dispatcher<void*, guarded_vector<void*, default_mem_interface>, default_mem_interface> dispatcher(vector);
-    
+    {
+        lock_free_batch_dispatcher<void*, guarded_vector<void*, default_mem_interface>, default_mem_interface> dispatcher(vector);
+    }
     vector.push_back(nullptr);
 
     random_device rd;

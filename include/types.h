@@ -36,13 +36,13 @@ namespace task_scheduler {
     template<typename ValueType, class TMemInterface>
     class base_thread_index
     {
-        typedef typename base_thread_pool<TMemInterface> thread_pool;
+        typedef base_thread_pool<TMemInterface> thread_pool;
 
     public:
         base_thread_index(thread_pool* _pool, ValueType _value) :
-            pool(_pool),
-            value(_value)
-        {
+            value(_value),
+            pool(_pool)
+            {
         }
 
         base_thread_index& operator++()
