@@ -2,10 +2,8 @@
 
 #include <cinttypes>
 
-namespace task_scheduler {
+namespace task_scheduler
+{
 
-    uint32_t get_cache_line_size()
-    {
-        return 64;
-    }
+    uint32_t get_cache_line_size() { return 64; }
 };

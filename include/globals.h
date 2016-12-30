@@ -1,13 +1,14 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <thread>
-#include <atomic>
 
 #include "platform.h"
 #include "types.h"
 
-namespace task_scheduler {
+namespace task_scheduler
+{
 
     const thread_num_t max_num_threads = 64;
 
@@ -15,10 +16,10 @@ namespace task_scheduler {
     {
         std::mutex io_mutex;
         ts_windows_only(HANDLE console_handle;);
-        std::atomic<thread_num_t> next_thread_number;
+        std::atomic< thread_num_t > next_thread_number;
 
-        static_data_t() :
-            next_thread_number(1)
+        static_data_t()
+            : next_thread_number(1)
         {
             ts_windows_only(console_handle = GetStdHandle(STD_OUTPUT_HANDLE););
         }
@@ -28,7 +29,7 @@ namespace task_scheduler {
 
     thread_local std::string thread_name;
     thread_local thread_num_t thread_unique_number;
-    thread_local void* current_thread;
+    thread_local void *current_thread;
 
     inline uint8_t get_thread_number()
     {
@@ -39,15 +40,11 @@ namespace task_scheduler {
         return thread_unique_number;
     }
 
-    template <class T>
-    T* get_current_thread()
-    {
-        return static_cast<T*>(current_thread);
-    }
+    template < class T > T *get_current_thread() { return static_cast< T * >(current_thread); }
 
-#define task_scheduler_static_data() \
-    namespace task_scheduler { \
-            static_data_t globals; \
+#define task_scheduler_static_data()                                                                                   \
+    namespace task_scheduler                                                                                           \
+    {                                                                                                                  \
+        static_data_t globals;                                                                                         \
     };
-
 }

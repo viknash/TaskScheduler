@@ -2,9 +2,8 @@
 
 #include "platform.h"
 #include <algorithm>
-#include <random>
 #include <cinttypes>
-
+#include <random>
 
 #include "containers.h"
 #include "profile.h"
@@ -24,43 +23,46 @@ task_scheduler_static_data();
 
 void RandomTimeTask(chrono::milliseconds minTaskTime, chrono::milliseconds maxTaskTime)
 {
-    chrono::time_point<chrono::high_resolution_clock> start, end;
+    chrono::time_point< chrono::high_resolution_clock > start, end;
     start = end = chrono::high_resolution_clock::now();
     uint64_t minTaskTimeMs = chrono::microseconds(minTaskTime).count();
     uint64_t maxTaskTimeMs = chrono::microseconds(maxTaskTime).count();
 
     random_device rd;
     mt19937_64 gen(rd());
-    uniform_int_distribution<uint64_t> dis(minTaskTimeMs, maxTaskTimeMs);
+    uniform_int_distribution< uint64_t > dis(minTaskTimeMs, maxTaskTimeMs);
     uint64_t randomTime = dis(gen);
     chrono::microseconds randomTimeUS(randomTime);
 
-    while (end - start < randomTimeUS) {
+    while (end - start < randomTimeUS)
+    {
         end = chrono::high_resolution_clock::now();
     }
 }
 
 int main()
 {
-    typedef base_task_graph<default_mem_interface> task_graph_type;
-    typedef base_task_graph_helper<default_mem_interface> task_graph_helper_type;
-    typedef base_thread_pool<default_mem_interface> thread_pool;
+    typedef base_task_graph< default_mem_interface > task_graph_type;
+    typedef base_task_graph_helper< default_mem_interface > task_graph_helper_type;
+    typedef base_thread_pool< default_mem_interface > thread_pool;
 
     thread_pool pool(128);
     task_graph_type task_graph(pool);
     task_graph_helper_type task_graph_helper(task_graph);
     task_graph_helper.load("tasks.txt");
 
-    guarded_vector<void*, default_mem_interface> vector;
+    guarded_vector< void *, default_mem_interface > vector;
     {
-        lock_free_batch_dispatcher<void*, guarded_vector<void*, default_mem_interface>, default_mem_interface> dispatcher(vector);
+        lock_free_batch_dispatcher< void *, guarded_vector< void *, default_mem_interface >, default_mem_interface >
+            dispatcher(vector);
     }
     vector.push_back(nullptr);
 
     random_device rd;
     mt19937_64 gen(rd());
-    uniform_int_distribution<uint64_t> dis(0, 63);
-    for (auto& task : task_graph.debug.task_list) {
+    uniform_int_distribution< uint64_t > dis(0, 63);
+    for (auto &task : task_graph.debug.task_list)
+    {
         task->add_task_parallel_work(bind(RandomTimeTask, 1ms, 16ms));
         task->set_thread_affinity(create_mask_64(dis(gen), dis(gen), dis(gen)));
     }
