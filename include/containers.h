@@ -559,15 +559,52 @@ namespace task_scheduler
     {
 
       public:
+        /// <summary>
+        /// Initializes a new instance of the <see cref="guarded_write_array"/> class.
+        /// </summary>
+        /// <param name="_reserved_size">Size of the reserved.</param>
+        /// <param name="_optimize_for_cache_line_size">Size of the optimize for cache line.</param>
         guarded_write_array(size_t _reserverd_size, bool _optimize_for_cache_line_size);
+        /// <summary>
+        /// Initializes a new instance of the <see cref="guarded_write_array"/> class.
+        /// </summary>
+        /// <param name="_existing_array">The existing array.</param>
+        /// <param name="_existing_array_size">Size of the existing array.</param>
         guarded_write_array(T *_existing_array, size_t _existing_array_size);
+        /// <summary>
+        /// Finalizes an instance of the <see cref="guarded_write_array"/> class.
+        /// </summary>
+        ~guarded_write_array();        /// <summary>
+        /// Sizes this instance.
+        /// </summary>
+        /// <returns>size_t.</returns>
         size_t size() { return array_size; }
+        /// <summary>
+        /// Reserveds this instance.
+        /// </summary>
+        /// <returns>size_t.</returns>
         size_t reserved() { return array_flags.reserved_size; }
-        ~guarded_write_array();
-        T &operator[](size_t _index);
+
+        /// <summary>
+        /// Operator&s this instance.
+        /// </summary>
+        /// <returns>T *.</returns>
         T *operator&();
+        /// <summary>
+        /// Pushes the back.
+        /// </summary>
+        /// <param name="_new_item">The new item.</param>
         void push_back(const T &_new_item);
+        /// <summary>
+        /// Clears this instance.
+        /// </summary>
         void clear();
+        /// <summary>
+        /// Operator[]s the specified index.
+        /// </summary>
+        /// <param name="_index">The index.</param>
+        /// <returns>T &.</returns>
+        T& operator[](size_t _index);
 
         template < typename T, class TMemInterface > friend class guarded_write_array_batch_dispenser;
 
@@ -578,11 +615,28 @@ namespace task_scheduler
         };
 
       private:
+        /// <summary>
+        /// Locks this instance.
+        /// </summary>
         void lock();
+        /// <summary>
+        /// Unlocks this instance.
+        /// </summary>
         void unlock();
+        /// <summary>
+        /// The array flags
+        /// </summary>
+        /// <returns>bool.</returns>
+        /// /
         bool is_locked();
 
+        /// <summary>
+        /// The data
+        /// </summary>
         T *data;
+        /// <summary>
+        /// The array size
+        /// </summary>
         std::atomic< size_t > array_size;
         flags array_flags;
     };
@@ -628,6 +682,7 @@ namespace task_scheduler
         return data + _index;
     }
 
+
     template < typename T, class TMemInterface >
     inline void guarded_write_array< T, TMemInterface >::push_back(const T &_new_item)
     {
@@ -637,11 +692,13 @@ namespace task_scheduler
         *(data + array_size - 1) = _new_item;
     }
 
+
     template < typename T, class TMemInterface > inline void guarded_write_array< T, TMemInterface >::clear()
     {
         assert(!is_locked()); // Array has been locked for reading
         array_size = 0;
     }
+
 
     template < typename T, class TMemInterface > inline T *guarded_write_array< T, TMemInterface >::operator&()
     {
@@ -649,11 +706,13 @@ namespace task_scheduler
         return data;
     }
 
+
     template < typename T, class TMemInterface > inline void guarded_write_array< T, TMemInterface >::lock()
     {
         assert(!array_flags.read_locked); // Array has already been locked before
         array_flags.read_locked = 1;
     }
+
 
     template < typename T, class TMemInterface > inline void guarded_write_array< T, TMemInterface >::unlock()
     {
@@ -661,24 +720,52 @@ namespace task_scheduler
         array_flags.read_locked = 0;
     }
 
+
     template < typename T, class TMemInterface > inline bool guarded_write_array< T, TMemInterface >::is_locked()
     {
         return array_flags.read_locked;
     }
 
+    /// <summary>
+    /// Class lock_free_batch_dispatcher.
+    /// </summary>
+    /// <seealso cref="TMemInterface" />
     template < typename T, class TDataType, class TMemInterface >
     class lock_free_batch_dispatcher : public TMemInterface
     {
       public:
-        lock_free_batch_dispatcher(TDataType &_data_type);
-        ~lock_free_batch_dispatcher();
+          /// <summary>
+          /// Initializes a new instance of the <see cref="lock_free_batch_dispatcher" /> class.
+          /// </summary>
+          /// <param name="_data_type">Type of the data.</param>
+          lock_free_batch_dispatcher(TDataType &_data_type);
+          /// <summary>
+          /// Finalizes an instance of the <see cref="lock_free_batch_dispatcher" /> class.
+          /// </summary>
+          ~lock_free_batch_dispatcher();
+        /// <summary>
+        /// Gets the next batch.
+        /// </summary>
+        /// <param name="_requested_batch_size">Size of the requested batch.</param>
+        /// <param name="_returned_batch_size">Size of the returned batch.</param>
+        /// <returns>T *.</returns>
         T *get_next_batch(size_t _requested_batch_size, size_t &_returned_batch_size);
 
       private:
-        TDataType &data;
+          /// <summary>
+          /// The data
+          /// </summary>
+          TDataType &data;
+        /// <summary>
+        /// The locked data
+        /// </summary>
         T *locked_data;
+        /// <summary>
+        /// The next batch index
+        /// </summary>
         std::atomic< size_t > next_batch_index;
     };
+
 
     template < typename T, class TDataType, class TMemInterface >
     lock_free_batch_dispatcher< T, TDataType, TMemInterface >::lock_free_batch_dispatcher(
@@ -690,12 +777,14 @@ namespace task_scheduler
         data.lock(locked_data);
     }
 
+
     template < typename T, class TDataType, class TMemInterface >
     lock_free_batch_dispatcher< T, TDataType, TMemInterface >::~lock_free_batch_dispatcher()
     {
         data.unlock(locked_data);
         ts_debug_only(next_batch_index = 0;);
     }
+
 
     template < typename T, class TDataType, class TMemInterface >
     T *lock_free_batch_dispatcher< T, TDataType, TMemInterface >::get_next_batch(size_t _requested_batch_size,

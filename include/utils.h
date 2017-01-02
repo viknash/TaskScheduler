@@ -1,3 +1,12 @@
+// ***********************************************************************
+// Assembly         : task_scheduler
+// Author           : viknash
+// ***********************************************************************
+// <copyright file="utils.h" >
+//     Copyright (c) viknash. All rights reserved.
+// </copyright>
+// <summary></summary>
+// ***********************************************************************
 #pragma once
 
 #include <atomic>
@@ -34,25 +43,49 @@
 
 #define ts_unique_variable(basename) ts_join_string(basename, __COUNTER__)
 
+/// <summary>
+/// The task_scheduler namespace.
+/// </summary>
 namespace task_scheduler
 {
 
+    /// <summary>
+    /// Creates the mask 64.
+    /// </summary>
+    /// <returns>thread_mask_int_t.</returns>
     inline thread_mask_int_t create_mask_64() { return 0; }
 
+    /// <summary>
+    /// Creates the mask 64.
+    /// </summary>
+    /// <param name="first">The first.</param>
+    /// <param name="...args">The ...args.</param>
+    /// <returns>thread_mask_int_t.</returns>
     template < typename T, typename... Args > thread_mask_int_t create_mask_64(T first, Args... args)
     {
         return create_mask_64(args...) | 1ull << first;
     }
 
+    /// <summary>
+    /// Class unsafe_multi_threaded_access_detector.
+    /// </summary>
     template < class T > class unsafe_multi_threaded_access_detector
     {
 
       public:
-        unsafe_multi_threaded_access_detector()
+          /// <summary>
+          /// Initializes a new instance of the <see cref="unsafe_multi_threaded_access_detector"/> class.
+          /// </summary>
+          unsafe_multi_threaded_access_detector()
             : previous_thread_id(0)
         {
         }
 
+        /// <summary>
+        /// Enters the specified storage.
+        /// </summary>
+        /// <param name="storage">The storage.</param>
+        /// <returns>bool.</returns>
         bool enter(T &storage)
         {
             int64_t new_thread_id = std::hash< std::thread::id >()(std::this_thread::get_id());
@@ -62,6 +95,11 @@ namespace task_scheduler
             return success;
         }
 
+        /// <summary>
+        /// Exits the specified storage.
+        /// </summary>
+        /// <param name="storage">The storage.</param>
+        /// <returns>bool.</returns>
         bool exit(T &storage)
         {
             int64_t stored_thread_id = storage.last_thread_id.exchange(previous_thread_id);
@@ -72,30 +110,56 @@ namespace task_scheduler
         }
 
       private:
-        std::atomic_int64_t previous_thread_id;
+          /// <summary>
+          /// The previous thread identifier
+          /// </summary>
+          std::atomic_int64_t previous_thread_id;
     };
 
+    /// <summary>
+    /// Class scoped_enter_exit.
+    /// </summary>
+    /// <seealso cref="T" />
     template < typename T, typename TParam > class scoped_enter_exit : public T
     {
       public:
-        scoped_enter_exit(TParam &_param)
+          /// <summary>
+          /// Initializes a new instance of the <see cref="scoped_enter_exit"/> class.
+          /// </summary>
+          /// <param name="_param">The parameter.</param>
+          scoped_enter_exit(TParam &_param)
             : param(_param)
         {
             this->enter(param);
         }
 
+        /// <summary>
+        /// Finalizes an instance of the <see cref="scoped_enter_exit"/> class.
+        /// </summary>
         ~scoped_enter_exit() { this->exit(param); }
 
       private:
-        TParam &param;
+          /// <summary>
+          /// The parameter
+          /// </summary>
+          TParam &param;
     };
 
+    /// <summary>
+    /// Struct thread_unsafe_access_storage
+    /// </summary>
     struct thread_unsafe_access_storage
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="thread_unsafe_access_storage"/> struct.
+        /// </summary>
         thread_unsafe_access_storage()
             : last_thread_id(0)
         {
         }
+        /// <summary>
+        /// The last thread identifier
+        /// </summary>
         std::atomic_int64_t last_thread_id;
     };
 

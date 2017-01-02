@@ -1,3 +1,12 @@
+// ***********************************************************************
+// Assembly         : task_scheduler
+// Author           : viknash
+// ***********************************************************************
+// <copyright file="threadpool.h" >
+//     Copyright (c) viknash. All rights reserved.
+// </copyright>
+// <summary></summary>
+// ***********************************************************************
 #pragma once
 
 #include <algorithm>
@@ -10,6 +19,9 @@
 #include "meta.h"
 #include "profile.h"
 
+/// <summary>
+/// The task_scheduler namespace.
+/// </summary>
 namespace task_scheduler
 {
 
@@ -18,6 +30,9 @@ namespace task_scheduler
     template < class TMemInterface > class base_thread_pool;
     template < class TMemInterface > struct base_thread;
 
+    /// <summary>
+    /// Class base_thread_pool.
+    /// </summary>
     template < class TMemInterface > class base_thread_pool
     {
         typedef base_thread< TMemInterface > thread_type;
@@ -29,34 +44,86 @@ namespace task_scheduler
         typedef typename thread_type::thread_index_type thread_index_type;
 
       public:
-        enum state_selector
+          /// <summary>
+          /// Enum state_selector
+          /// </summary>
+          enum state_selector
         {
             run = 0,
             request_pause,
             request_stop
         };
 
-        struct setup_container
+          /// <summary>
+          /// Struct setup_container
+          /// </summary>
+          struct setup_container
         {
-            std::mutex signal;
-            std::condition_variable radio;
-            std::atomic_uint32_t thread_sync;
-            std::atomic< state_selector > request_exit;
+              /// <summary>
+              /// The signal
+              /// </summary>
+              std::mutex signal;
+              /// <summary>
+              /// The radio
+              /// </summary>
+              std::condition_variable radio;
+              /// <summary>
+              /// The thread synchronize
+              /// </summary>
+              std::atomic_uint32_t thread_sync;
+              /// <summary>
+              /// The request exit
+              /// </summary>
+              std::atomic< state_selector > request_exit;
         };
 
       public:
-        base_thread_pool(thread_num_t _num_threads = max_num_threads);
-        void start(task_graph_type &task_graph);
-        void stop();
-        void wake_up(thread_num_t num_threads_to_wake_up = max_num_threads);
-        thread_type *get_current_thread();
+          /// <summary>
+          /// Initializes a new instance of the <see cref="base_thread_pool"/> class.
+          /// </summary>
+          /// <param name="_num_threads">The number threads.</param>
+          base_thread_pool(thread_num_t _num_threads = max_num_threads);
+          /// <summary>
+          /// Starts the specified task graph.
+          /// </summary>
+          /// <param name="task_graph">The task graph.</param>
+          void start(task_graph_type &task_graph);
+          /// <summary>
+          /// Stops this instance.
+          /// </summary>
+          void stop();
+          /// <summary>
+          /// Wakes up.
+          /// </summary>
+          /// <param name="num_threads_to_wake_up">The number threads to wake up.</param>
+          void wake_up(thread_num_t num_threads_to_wake_up = max_num_threads);
+          /// <summary>
+          /// Gets the current thread.
+          /// </summary>
+          /// <returns>thread_type *.</returns>
+          thread_type *get_current_thread();
 
-        setup_container setup;
-        thread_num_t num_threads;
-        task_graph_type *task_graph;
-        thread_type *threads[max_num_threads];
-        task_memory_allocator_type task_memory_allocator;
-        std::atomic< uint32_t > num_working;
+          /// <summary>
+          /// The setup
+          /// </summary>
+          setup_container setup;
+          /// <summary>
+          /// The number threads
+          /// </summary>
+          thread_num_t num_threads;
+          /// <summary>
+          /// The task graph
+          /// </summary>
+          task_graph_type *task_graph;
+          thread_type *threads[max_num_threads];
+          /// <summary>
+          /// The threads
+          /// </summary>
+          task_memory_allocator_type task_memory_allocator;
+          /// <summary>
+          /// The number working
+          /// </summary>
+          std::atomic< uint32_t > num_working;
 
         optimization std::atomic< typename task_type::rank_type > queue_rank[task_type::num_priority][max_num_threads];
     };

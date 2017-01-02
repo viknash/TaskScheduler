@@ -1,3 +1,12 @@
+// ***********************************************************************
+// Assembly         : task_scheduler
+// Author           : viknash
+// ***********************************************************************
+// <copyright file="print.h" >
+//     Copyright (c) viknash. All rights reserved.
+// </copyright>
+// <summary></summary>
+// ***********************************************************************
 #pragma once
 
 #include <atomic>
@@ -15,20 +24,37 @@
 #error("TASK_SCHEDULER_DEBUG is not defined")
 #endif // !defined(TASK_SCHEDULER_DEBUG)
 
+/// <summary>
+/// The task_scheduler namespace.
+/// </summary>
 namespace task_scheduler
 {
 
 #if defined(TASK_SCHEDULER_DEBUG)
+    /// <summary>
+    /// Struct out_t
+    /// </summary>
     struct out_t
     {
+        /// <summary>
+        /// Operators the specified x.
+        /// </summary>
+        /// <param name="x">The x.</param>
+        /// <returns>task_scheduler.out_t &.</returns>
         template < typename T > out_t &operator<<(T &&x)
         {
             buffer << x;
             return *this;
         };
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="out_t"/> struct.
+        /// </summary>
         out_t() { buffer << thread_name << "> "; }
 
+        /// <summary>
+        /// Finalizes an instance of the <see cref="out_t"/> class.
+        /// </summary>
         ~out_t()
         {
             std::lock_guard< std::mutex > lk(globals.io_mutex);
@@ -36,11 +62,22 @@ namespace task_scheduler
             std::cout << buffer.str() << std::endl;
         }
 
+        /// <summary>
+        /// The buffer
+        /// </summary>
         std::ostringstream buffer;
     };
 #else  // defined(TASK_SCHEDULER_DEBUG)
+    /// <summary>
+    /// Struct out_t
+    /// </summary>
     struct out_t
     {
+        /// <summary>
+        /// Operators the specified x.
+        /// </summary>
+        /// <param name="x">The x.</param>
+        /// <returns>task_scheduler.out_t &.</returns>
         template < typename T > out_t &operator<<(T &&x) { return *this; };
     };
 #endif // defined(TASK_SCHEDULER_DEBUG)

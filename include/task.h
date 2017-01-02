@@ -1,3 +1,12 @@
+// ***********************************************************************
+// Assembly         : task_scheduler
+// Author           : viknash
+// ***********************************************************************
+// <copyright file="task.h" >
+//     Copyright (c) viknash. All rights reserved.
+// </copyright>
+// <summary></summary>
+// ***********************************************************************
 #pragma once
 
 #include <atomic>
@@ -9,6 +18,9 @@
 #include "print.h"
 #include "types.h"
 
+/// <summary>
+/// The task_scheduler namespace.
+/// </summary>
 namespace task_scheduler
 {
 
@@ -17,6 +29,10 @@ namespace task_scheduler
     template < class TMemInterface > struct base_thread;
     template < class task_type, class TMemInterface > struct base_sub_graph;
 
+    /// <summary>
+    /// Class base_task.
+    /// </summary>
+    /// <seealso cref="TMemInterface" />
     template < class TMemInterface > class base_task : public TMemInterface
     {
       public:
@@ -39,6 +55,9 @@ namespace task_scheduler
             function_type *, TMemInterface, work_memory_allocator_type * >
             work_queue_type;
 
+        /// <summary>
+        /// Enum priority_selector
+        /// </summary>
         enum priority_selector
         {
             realtime,
@@ -48,57 +67,183 @@ namespace task_scheduler
             num_priority
         };
 
+        /// <summary>
+        /// Struct debug_container
+        /// </summary>
         struct debug_container
         {
+            /// <summary>
+            /// Priorities to string.
+            /// </summary>
+            /// <param name="_priority">The priority.</param>
+            /// <returns>const char *.</returns>
             const char *priority_to_string(priority_selector _priority) const;
 
+            /// <summary>
+            /// The task name
+            /// </summary>
             string_type task_name;
+            /// <summary>
+            /// The dependent task names
+            /// </summary>
             string_vector dependent_task_names;
         };
 
+        /// <summary>
+        /// Struct transient_container
+        /// </summary>
         struct transient_container
         {
+            /// <summary>
+            /// Initializes a new instance of the <see cref="base_task{TMemInterface}.transient_container"/> struct.
+            /// </summary>
             transient_container();
+            /// <summary>
+            /// Finalizes an instance of the <see cref="base_task{TMemInterface}.transient_container"/> class.
+            /// </summary>
             ~transient_container();
 
+            /// <summary>
+            /// The start gate
+            /// </summary>
             std::atomic_int64_t start_gate;
+            /// <summary>
+            /// The work queue
+            /// </summary>
             work_queue_type *work_queue;
+            /// <summary>
+            /// The work allocator
+            /// </summary>
             work_memory_allocator_type work_allocator;
+            /// <summary>
+            /// The number working
+            /// </summary>
             std::atomic_int64_t num_working;
         };
 
+        /// <summary>
+        /// Struct persistent_container
+        /// </summary>
         struct persistent_container
         {
+            /// <summary>
+            /// Initializes a new instance of the <see cref="base_task{TMemInterface}.persistent_container"/> struct.
+            /// </summary>
             persistent_container();
+            /// <summary>
+            /// Finalizes an instance of the <see cref="base_task{TMemInterface}.persistent_container"/> class.
+            /// </summary>
             ~persistent_container();
 
+            /// <summary>
+            /// The task priority
+            /// </summary>
             priority_selector task_priority;
+            /// <summary>
+            /// The parent tasks
+            /// </summary>
             task_vector parent_tasks;
+            /// <summary>
+            /// The dependent tasks
+            /// </summary>
             task_vector dependent_tasks;
+            /// <summary>
+            /// The kick tasks
+            /// </summary>
             task_vector kick_tasks;
+            /// <summary>
+            /// The sub graph
+            /// </summary>
             sub_graph_type *sub_graph;
+            /// <summary>
+            /// The rank
+            /// </summary>
             rank_type rank;
+            /// <summary>
+            /// The thread affinity
+            /// </summary>
             int64_t thread_affinity;
+            /// <summary>
+            /// The task work
+            /// </summary>
             task_work_vector task_work;
         };
 
-        void set_thread_affinity(thread_mask_int_t _mask);
-        void set_thread_exclusion(thread_mask_int_t _mask);
-        void set_num_workers(thread_num_t _num_workers);
-        void set_num_workers(percentage_t _percentage_workers);
+        /// <summary>
+        /// Initializes a new instance of the <see cref="base_task"/> class.
+        /// </summary>
+        /// <param name="_task_graph">The task graph.</param>
         base_task(task_graph_type &_task_graph);
+        /// <summary>
+        /// Finalizes an instance of the <see cref="base_task"/> class.
+        /// </summary>
         ~base_task();
+        /// <summary>
+        /// Sets the thread affinity.
+        /// </summary>
+        /// <param name="_mask">The mask.</param>
+        void set_thread_affinity(thread_mask_int_t _mask);
+        /// <summary>
+        /// Sets the thread exclusion.
+        /// </summary>
+        /// <param name="_mask">The mask.</param>
+        void set_thread_exclusion(thread_mask_int_t _mask);
+        /// <summary>
+        /// Sets the number workers.
+        /// </summary>
+        /// <param name="_num_workers">The number workers.</param>
+        void set_num_workers(thread_num_t _num_workers);
+        /// <summary>
+        /// Sets the number workers.
+        /// </summary>
+        /// <param name="_percentage_workers">The percentage workers.</param>
+        void set_num_workers(percentage_t _percentage_workers);
+        /// <summary>
+        /// Finalizes this instance.
+        /// </summary>
         void finalize();
+        /// <summary>
+        /// Kicks the dependent tasks.
+        /// </summary>
         void kick_dependent_tasks();
+        /// <summary>
+        /// Adds the task parallel work.
+        /// </summary>
+        /// <param name="_work_function">The work function.</param>
+        /// <returns>bool.</returns>
         bool add_task_parallel_work(function_type _work_function);
+        /// <summary>
+        /// Operator()s this instance.
+        /// </summary>
+        /// <returns>bool.</returns>
         bool operator()();
+        /// <summary>
+        /// Links the task.
+        /// </summary>
+        /// <param name="_next_task">The next task.</param>
+        /// <returns>bool.</returns>
         bool link_task(task_type *_next_task);
 
+        /// <summary>
+        /// The debug
+        /// </summary>
         debug_container debug;
+        /// <summary>
+        /// The transient
+        /// </summary>
         transient_container transient;
+        /// <summary>
+        /// The persistent
+        /// </summary>
         persistent_container persistent;
+        /// <summary>
+        /// The task graph
+        /// </summary>
         task_graph_type &task_graph;
 
+        /// <summary>
+        /// The add task parallel work detector
+        /// </summary>
         thread_unsafe_access_storage add_task_parallel_work_detector;
     };
 

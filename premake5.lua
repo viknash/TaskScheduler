@@ -9,7 +9,7 @@
             architecture "x64"
             toolset "v140"
 		    flags { "ExtraWarnings", "MultiProcessorCompile" }
-            buildoptions    { "/GR-" }
+            buildoptions    { "/GR-", "/doc" }
 
         filter { "platforms:Win64-Clang" }
             system "Windows"

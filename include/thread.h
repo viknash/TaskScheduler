@@ -1,3 +1,12 @@
+// ***********************************************************************
+// Assembly         : task_scheduler
+// Author           : viknash
+// ***********************************************************************
+// <copyright file="thread.h" >
+//     Copyright (c) viknash. All rights reserved.
+// </copyright>
+// <summary></summary>
+// ***********************************************************************
 #pragma once
 
 #include <condition_variable>
@@ -8,6 +17,9 @@
 #include "print.h"
 #include "profile.h"
 
+/// <summary>
+/// The task_scheduler namespace.
+/// </summary>
 namespace task_scheduler
 {
 
@@ -15,6 +27,9 @@ namespace task_scheduler
     template < class TMemInterface > class base_task_graph;
     template < class TMemInterface > class base_thread_pool;
 
+    /// <summary>
+    /// Struct base_thread
+    /// </summary>
     template < class TMemInterface > struct base_thread : public TMemInterface
     {
         typedef base_task_graph< TMemInterface > task_graph_type;
@@ -25,32 +40,90 @@ namespace task_scheduler
         typedef typename task_graph_type::task_memory_allocator_type task_memory_allocator_type;
         typedef thread_index_t< TMemInterface > thread_index_type;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="base_thread{TMemInterface}"/> struct.
+        /// </summary>
+        /// <param name="_thread_index">Index of the thread.</param>
+        /// <param name="_pool">The pool.</param>
         base_thread(thread_num_t _thread_index, thread_pool *_pool);
+        /// <summary>
+        /// Finalizes an instance of the <see cref="base_thread{TMemInterface}"/> class.
+        /// </summary>
         ~base_thread();
 
+        /// <summary>
+        /// Creates the thread.
+        /// </summary>
+        /// <param name="_pool">The pool.</param>
+        /// <returns>thread_type *.</returns>
         static thread_type *create_thread(thread_pool *_pool);
 
+        /// <summary>
+        /// Sleeps the specified wake up.
+        /// </summary>
+        /// <param name="_wake_up">The wake up.</param>
         void sleep(bool (thread_type::*_wake_up)());
+        /// <summary>
+        /// Wakes up.
+        /// </summary>
         void wake_up();
+        /// <summary>
+        /// Joins this instance.
+        /// </summary>
         void join();
 
         task_queue_type *task_queue[task_type::num_priority];
+        /// <summary>
+        /// The task queue
+        /// </summary>
         thread_index_type thread_index;
+        /// <summary>
+        /// The thread identifier
+        /// </summary>
         std::thread::id thread_id;
+        /// <summary>
+        /// The task thread
+        /// </summary>
         std::thread task_thread;
+        /// <summary>
+        /// The allocator
+        /// </summary>
         task_memory_allocator_type allocator;
 
         friend class std::thread;
 
       private:
-        void init();
-        void run();
-        bool is_task_available();
-        task_type *get_task();
+          /// <summary>
+          /// Initializes this instance.
+          /// </summary>
+          void init();
+          /// <summary>
+          /// Runs this instance.
+          /// </summary>
+          void run();
+          /// <summary>
+          /// Determines whether [is task available].
+          /// </summary>
+          /// <returns>bool.</returns>
+          bool is_task_available();
+          /// <summary>
+          /// Gets the task.
+          /// </summary>
+          /// <returns>task_type *.</returns>
+          task_type *get_task();
 
-        thread_pool &pool;
-        std::mutex signal;
-        std::condition_variable radio;
+          /// <summary>
+          /// The pool
+          /// </summary>
+          thread_pool &pool;
+          /// <summary>
+          /// The signal
+          /// </summary>
+          std::mutex signal;
+          /// <summary>
+          /// The radio
+          /// </summary>
+          std::condition_variable radio;
     };
 
     template < class TMemInterface >

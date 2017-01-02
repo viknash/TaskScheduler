@@ -1,3 +1,12 @@
+// ***********************************************************************
+// Assembly         : task_scheduler
+// Author           : viknash
+// ***********************************************************************
+// <copyright file="taskgraphhelper.h" >
+//     Copyright (c) viknash. All rights reserved.
+// </copyright>
+// <summary></summary>
+// ***********************************************************************
 #pragma once
 
 #include <algorithm>
@@ -29,12 +38,29 @@ namespace task_scheduler
         typedef base_task_graph< TMemInterface > task_graph_type;
 
       public:
-        base_task_graph_helper(task_graph_type &_task_graph);
+          /// <summary>
+          /// Initializes a new instance of the <see cref="base_task_graph_helper"/> class.
+          /// </summary>
+          /// <param name="_task_graph">The task graph.</param>
+          base_task_graph_helper(task_graph_type &_task_graph);
 
-        void load(string_type _file_name);
-        void setup_task(task_type *_task, uint32_t _task_file_field, string_type str);
+          /// <summary>
+          /// Loads the specified file name.
+          /// </summary>
+          /// <param name="_file_name">Name of the file.</param>
+          void load(string_type _file_name);
+          /// <summary>
+          /// Setups the task.
+          /// </summary>
+          /// <param name="_task">The task.</param>
+          /// <param name="_task_file_field">The task file field.</param>
+          /// <param name="str">The string.</param>
+          void setup_task(task_type *_task, uint32_t _task_file_field, string_type str);
 
-        task_graph_type &task_graph;
+          /// <summary>
+          /// The task graph
+          /// </summary>
+          task_graph_type &task_graph;
     };
 
     template < class TMemInterface >

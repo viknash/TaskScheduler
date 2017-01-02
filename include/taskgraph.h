@@ -1,3 +1,12 @@
+// ***********************************************************************
+// Assembly         : task_scheduler
+// Author           : viknash
+// ***********************************************************************
+// <copyright file="taskgraph.h" >
+//     Copyright (c) viknash. All rights reserved.
+// </copyright>
+// <summary></summary>
+// ***********************************************************************
 #pragma once
 
 #include <algorithm>
@@ -11,23 +20,42 @@
 
 #include "containers.h"
 
+/// <summary>
+/// The task_scheduler namespace.
+/// </summary>
 namespace task_scheduler
 {
 
     template < class TMemInterface > class base_task;
     template < class TMemInterface > class base_thread_pool;
 
+    /// <summary>
+    /// Struct base_sub_graph
+    /// </summary>
     template < class task_type, class TMemInterface > struct base_sub_graph : public TMemInterface
     {
         typedef std::vector< task_type *, stl_allocator< task_type *, TMemInterface > > task_vector;
+        /// <summary>
+        /// The head tasks
+        /// </summary>
         task_vector head_tasks;
+        /// <summary>
+        /// The tail tasks
+        /// </summary>
         task_vector tail_tasks;
+        /// <summary>
+        /// The task list
+        /// </summary>
         task_vector task_list;
 
         // Frame Rate
         // Periodic Updates
     };
 
+    /// <summary>
+    /// Class base_task_graph.
+    /// </summary>
+    /// <seealso cref="TMemInterface" />
     template < class TMemInterface > class base_task_graph : public TMemInterface
     {
       public:
@@ -48,15 +76,34 @@ namespace task_scheduler
         typedef task_type *task_list;
         typedef std::function< void(task_type *, void *&) > traversal_function_type;
 
+        /// <summary>
+        /// Struct persistent_container
+        /// </summary>
         struct persistent_container
         {
+            /// <summary>
+            /// The head tasks
+            /// </summary>
             task_vector head_tasks;
+            /// <summary>
+            /// The tail tasks
+            /// </summary>
             task_vector tail_tasks;
+            /// <summary>
+            /// The sub graphs
+            /// </summary>
             sub_graph_vector sub_graphs;
         };
 
+        /// <summary>
+        /// Struct transient_container
+        /// </summary>
         struct transient_container
         {
+            /// <summary>
+            /// Initializes a new instance of the <see cref="base_task_graph{TMemInterface}.transient_container"/> struct.
+            /// </summary>
+            /// <param name="allocator">The allocator.</param>
             transient_container(task_memory_allocator_type *allocator)
             {
                 for (auto &queue : task_queue)
@@ -64,6 +111,9 @@ namespace task_scheduler
                     queue = new task_queue_type(allocator);
                 }
             }
+            /// <summary>
+            /// Finalizes an instance of the <see cref="base_task_graph{TMemInterface}.transient_container"/> class.
+            /// </summary>
             ~transient_container()
             {
                 for (auto &queue : task_queue)
@@ -72,47 +122,158 @@ namespace task_scheduler
                     queue = nullptr;
                 }
             }
+            /// <summary>
+            /// The task queue
+            /// </summary>
             task_queue_type *task_queue[task_type::num_priority];
         };
 
+        /// <summary>
+        /// Struct debug_container
+        /// </summary>
         struct debug_container
         {
+            /// <summary>
+            /// The task name to task
+            /// </summary>
             task_name_to_task_map task_name_to_task;
+            /// <summary>
+            /// The task list
+            /// </summary>
             task_vector task_list;
         };
 
       public:
-        base_task_graph(thread_pool &_pool);
-        ~base_task_graph();
+          /// <summary>
+          /// Initializes a new instance of the <see cref="base_task_graph"/> class.
+          /// </summary>
+          /// <param name="_pool">The pool.</param>
+          base_task_graph(thread_pool &_pool);
+          /// <summary>
+          /// Finalizes an instance of the <see cref="base_task_graph"/> class.
+          /// </summary>
+          ~base_task_graph();
 
-        void setup(sub_graph_type *_sub_graph = nullptr);
-        void load(string_type _file_name);
-        void initialize();
-        void set_task_thread_affinity(task_type *_task, uint64_t _mask);
-        void set_task_thread_exclusion(task_type *_task, uint64_t _mask);
-        void set_num_workers(task_type *_task, thread_num_t _num_workers);
-        void set_percentage_of_workers(task_type *_task, float _percentage_workers);
-        void setup_tail_kickers();
-        void depth_first_visitor(task_type *_task, traversal_function_type _preorder_functor,
+          /// <summary>
+          /// Setups the specified sub graph.
+          /// </summary>
+          /// <param name="_sub_graph">The sub graph.</param>
+          void setup(sub_graph_type *_sub_graph = nullptr);
+          /// <summary>
+          /// Loads the specified file name.
+          /// </summary>
+          /// <param name="_file_name">Name of the file.</param>
+          void load(string_type _file_name);
+          /// <summary>
+          /// Initializes this instance.
+          /// </summary>
+          void initialize();
+          /// <summary>
+          /// Sets the task thread affinity.
+          /// </summary>
+          /// <param name="_task">The task.</param>
+          /// <param name="_mask">The mask.</param>
+          void set_task_thread_affinity(task_type *_task, uint64_t _mask);
+          /// <summary>
+          /// Sets the task thread exclusion.
+          /// </summary>
+          /// <param name="_task">The task.</param>
+          /// <param name="_mask">The mask.</param>
+          void set_task_thread_exclusion(task_type *_task, uint64_t _mask);
+          /// <summary>
+          /// Sets the number workers.
+          /// </summary>
+          /// <param name="_task">The task.</param>
+          /// <param name="_num_workers">The number workers.</param>
+          void set_num_workers(task_type *_task, thread_num_t _num_workers);
+          /// <summary>
+          /// Sets the percentage of workers.
+          /// </summary>
+          /// <param name="_task">The task.</param>
+          /// <param name="_percentage_workers">The percentage workers.</param>
+          void set_percentage_of_workers(task_type *_task, float _percentage_workers);
+          /// <summary>
+          /// Setups the tail kickers.
+          /// </summary>
+          void setup_tail_kickers();
+          /// <summary>
+          /// Depthes the first visitor.
+          /// </summary>
+          /// <param name="_task">The task.</param>
+          /// <param name="_preorder_functor">The preorder functor.</param>
+          /// <param name="_inorder_functor">The inorder functor.</param>
+          /// <param name="_post_order_functor">The post order functor.</param>
+          /// <param name="_tail_functor">The tail functor.</param>
+          /// <param name="_param">The parameter.</param>
+          /// <param name="_bottom_up">The bottom up.</param>
+          void depth_first_visitor(task_type *_task, traversal_function_type _preorder_functor,
                                  traversal_function_type _inorder_functor, traversal_function_type _post_order_functor,
                                  traversal_function_type _tail_functor, void *_param, bool _bottom_up = false);
-        void kick();
+          /// <summary>
+          /// Kicks this instance.
+          /// </summary>
+          void kick();
 
-        void queue_task(task_type *_task, thread_num_t _num_threads_to_wake_up = 1);
-        task_type *dequeue_task(uint32_t _priority);
-        bool is_task_available();
-        bool link_task(task_type *_parent_task, task_type *_dependent_task);
+          /// <summary>
+          /// Queues the task.
+          /// </summary>
+          /// <param name="_task">The task.</param>
+          /// <param name="_num_threads_to_wake_up">The number threads to wake up.</param>
+          void queue_task(task_type *_task, thread_num_t _num_threads_to_wake_up = 1);
+          /// <summary>
+          /// Dequeues the task.
+          /// </summary>
+          /// <param name="_priority">The priority.</param>
+          /// <returns>task_type *.</returns>
+          task_type *dequeue_task(uint32_t _priority);
+          /// <summary>
+          /// Determines whether [is task available].
+          /// </summary>
+          /// <returns>bool.</returns>
+          bool is_task_available();
+          /// <summary>
+          /// Links the task.
+          /// </summary>
+          /// <param name="_parent_task">The parent task.</param>
+          /// <param name="_dependent_task">The dependent task.</param>
+          /// <returns>bool.</returns>
+          bool link_task(task_type *_parent_task, task_type *_dependent_task);
 
       private:
-        bool find_head(task_vector &_head_list);
-        size_t size(task_list _task_list) const;
-        task_memory_allocator_type task_memory_allocator;
+          /// <summary>
+          /// Finds the head.
+          /// </summary>
+          /// <param name="_head_list">The head list.</param>
+          /// <returns>bool.</returns>
+          bool find_head(task_vector &_head_list);
+          /// <summary>
+          /// Sizes the specified task list.
+          /// </summary>
+          /// <param name="_task_list">The task list.</param>
+          /// <returns>size_t.</returns>
+          size_t size(task_list _task_list) const;
+          /// <summary>
+          /// The task memory allocator
+          /// </summary>
+          task_memory_allocator_type task_memory_allocator;
 
       public:
-        persistent_container persistent;
-        transient_container transient;
-        debug_container debug;
-        thread_pool &pool;
+          /// <summary>
+          /// The persistent
+          /// </summary>
+          persistent_container persistent;
+          /// <summary>
+          /// The transient
+          /// </summary>
+          transient_container transient;
+          /// <summary>
+          /// The debug
+          /// </summary>
+          debug_container debug;
+          /// <summary>
+          /// The pool
+          /// </summary>
+          thread_pool &pool;
     };
 
     template < class TMemInterface >

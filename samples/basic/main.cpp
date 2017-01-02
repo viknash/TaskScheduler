@@ -1,3 +1,12 @@
+// ***********************************************************************
+// Assembly         : task_scheduler
+// Author           : viknash
+// ***********************************************************************
+// <copyright file="main.cpp" >
+//     Copyright (c) viknash. All rights reserved.
+// </copyright>
+// <summary></summary>
+// ***********************************************************************
 #include "stdafx.h"
 
 #include "platform.h"
@@ -21,6 +30,11 @@ using namespace std;
 task_scheduler_default_mem_interface_catch_all_allocations();
 task_scheduler_static_data();
 
+/// <summary>
+/// Randoms the time task.
+/// </summary>
+/// <param name="minTaskTime">The minimum task time.</param>
+/// <param name="maxTaskTime">The maximum task time.</param>
 void RandomTimeTask(chrono::milliseconds minTaskTime, chrono::milliseconds maxTaskTime)
 {
     chrono::time_point< chrono::high_resolution_clock > start, end;
@@ -40,6 +54,10 @@ void RandomTimeTask(chrono::milliseconds minTaskTime, chrono::milliseconds maxTa
     }
 }
 
+/// <summary>
+/// Mains this instance.
+/// </summary>
+/// <returns>int.</returns>
 int main()
 {
     typedef base_task_graph< default_mem_interface > task_graph_type;
