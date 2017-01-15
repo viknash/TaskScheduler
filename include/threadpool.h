@@ -163,7 +163,10 @@ namespace task_scheduler
         }
 
         // kick all sleeping threads
-        wake_up();
+        for (uint32_t iterations = 0; iterations < num_threads; ++iterations)
+        {
+            threads[iterations]->start();
+        }
     }
 
     template < class TMemInterface > void base_thread_pool< TMemInterface >::stop()

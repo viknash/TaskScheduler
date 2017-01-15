@@ -16,6 +16,7 @@
 #include "globals.h"
 #include "print.h"
 #include "profile.h"
+#include "concurrency.h"
 
 /// <summary>
 /// The task_scheduler namespace.
@@ -91,12 +92,17 @@ namespace task_scheduler
         task_memory_allocator_type allocator;
 
         friend class std::thread;
+        template < class TMemInterface > friend class base_thread_pool;
 
       private:
           /// <summary>
           /// Initializes this instance.
           /// </summary>
           void init();
+          /// <summary>
+          /// Starts this thread
+          /// </summary>
+          void start();
           /// <summary>
           /// Runs this instance.
           /// </summary>
@@ -124,6 +130,10 @@ namespace task_scheduler
           /// The radio
           /// </summary>
           std::condition_variable radio;
+
+          event sync_point;
+
+          alarm execution;
     };
 
     template < class TMemInterface >
@@ -171,25 +181,27 @@ namespace task_scheduler
         pool.setup.radio.notify_one();
 
         // wake_up when all threads have started
-        std::unique_lock< std::mutex > signalLock(signal);
-        radio.wait(signalLock);
+        sync_point.wait();
+    }
+
+    template < class TMemInterface > void base_thread< TMemInterface >::start()
+    {
+        sync_point.signal();
     }
 
     template < class TMemInterface > void base_thread< TMemInterface >::sleep(bool (thread_type::*_wake_up)())
     {
-        std::unique_lock< std::mutex > signal_lock(signal);
-        while (!(this->*_wake_up)() && pool.setup.request_exit != thread_pool::request_stop)
-        {
-            ts_print("sleep");
-            radio.wait(signal_lock);
-            ts_print("awake");
-        }
+        execution.sleep(
+            [&]()->bool
+            {
+                return ((this->*_wake_up)() || pool.setup.request_exit == thread_pool::request_stop);
+            }
+        );
     }
 
     template < class TMemInterface > void base_thread< TMemInterface >::wake_up()
     {
-        std::unique_lock< std::mutex > signal_lock(signal);
-        radio.notify_one();
+        execution.wake_up();
     }
 
     template < class TMemInterface > void base_thread< TMemInterface >::join() { task_thread.join(); }
@@ -323,7 +335,7 @@ namespace task_scheduler
                 }
 
                 // We have to wakeup the thread as long as its task queue is touched
-                // There could be task that was stolen and returned, but the thread went to sleep during the steal and
+                // There could be task that was stolen and returned, but the thread went to sleep during the theft and
                 // before the return
                 if (touched_thread)
                 {

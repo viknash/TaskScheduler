@@ -254,3 +254,7 @@ paket-files/
 /*.sln
 /tests/multi_threaded_detector/multi_threaded_detector.vcxproj
 /tests/multi_threaded_detector/multi_threaded_detector.vcxproj.filters
+/tools/cmake
+/tests/multi_threaded_detector/*.xdc
+*.xdc
+*.dic
