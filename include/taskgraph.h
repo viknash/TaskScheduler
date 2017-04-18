@@ -299,6 +299,7 @@ namespace task_scheduler
             // memset(&(task->transient), 0x0, sizeof(task_type::transient_container));
             task->transient.start_gate = 0;
             task->transient.num_working = 0;
+            task->transient.task_time = 0ms;
         }
         for (auto task : *task_list)
         {

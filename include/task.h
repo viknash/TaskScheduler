@@ -119,6 +119,10 @@ namespace task_scheduler
             /// The number working
             /// </summary>
             std::atomic_int64_t num_working;
+            /// <summary>
+            /// Total time spent running all work functions in this task
+            /// </summary>
+            profile_time task_time;
         };
 
         /// <summary>
@@ -245,6 +249,13 @@ namespace task_scheduler
         /// The add task parallel work detector
         /// </summary>
         thread_unsafe_access_storage add_task_parallel_work_detector;
+
+    private:
+        /// <summary>
+        /// Calls the working function internally
+        /// </summary>
+        /// <returns>bool.</returns>
+        void run_internal(function_type* _work_function);
     };
 
     template < class TMemInterface >
@@ -270,6 +281,7 @@ namespace task_scheduler
     base_task< TMemInterface >::transient_container::transient_container()
         : work_queue(nullptr)
         , num_working(0)
+        , task_time(0ms)
     {
         work_queue = new work_queue_type(&work_allocator);
     }
@@ -286,10 +298,16 @@ namespace task_scheduler
         function_type *work_function = nullptr;
         if (transient.work_queue->pop_front(work_function))
         {
-            (*work_function)();
+            instrument< void, task_type, void (task_type::*)(function_type*) >(transient.task_time, this, &task_type::run_internal, work_function);
+            //(*work_function)();
             return true;
         }
         return false;
+    }
+
+    template < class TMemInterface > void base_task< TMemInterface >::run_internal(function_type* _work_function)
+    {
+        (*_work_function)();
     }
 
     template < class TMemInterface > void base_task< TMemInterface >::set_thread_affinity(thread_mask_int_t _mask)

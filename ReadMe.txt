@@ -49,6 +49,8 @@ To Do
 14. Implement natvis for taskgraph, lockfree queue
 16. http://www.codeproject.com/Tips/1055834/Cross-platform-Visual-Memory-Tracker
 17. parallel for
+18. swap transient containers every frame
+18.1 Create a harcoded benchmark task to analyse containers last frame
 
 To Test
 1. Test allocator alignment
