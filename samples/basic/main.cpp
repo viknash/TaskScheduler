@@ -69,7 +69,7 @@ int main()
     task_graph_helper_type task_graph_helper(task_graph);
     task_graph_helper.load("tasks.txt");
 
-    guarded_vector< void *, default_mem_interface > vector;
+    guarded_vector< void *, default_mem_interface > vector(128);
     {
         lock_free_batch_dispatcher< void *, guarded_vector< void *, default_mem_interface >, default_mem_interface >
             dispatcher(vector);

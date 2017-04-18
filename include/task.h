@@ -55,6 +55,8 @@ namespace task_scheduler
             function_type *, TMemInterface, work_memory_allocator_type * >
             work_queue_type;
 
+        typedef guarded_vector< void *, TMemInterface > data_vector;
+
         /// <summary>
         /// Enum priority_selector
         /// </summary>
@@ -97,7 +99,7 @@ namespace task_scheduler
             /// <summary>
             /// Initializes a new instance of the <see cref="base_task{TMemInterface}.transient_container"/> struct.
             /// </summary>
-            transient_container();
+            transient_container(size_t _max_data_parallel_workload);
             /// <summary>
             /// Finalizes an instance of the <see cref="base_task{TMemInterface}.transient_container"/> class.
             /// </summary>
@@ -123,6 +125,14 @@ namespace task_scheduler
             /// Total time spent running all work functions in this task
             /// </summary>
             profile_time task_time;
+            /// <summary>
+            /// Total number of times work function was called
+            /// </summary>
+            std::atomic_int64_t num_runned;
+            /// <summary>
+            /// Total number of times work function was called
+            /// </summary>
+            data_vector data_workload;
         };
 
         /// <summary>
@@ -177,7 +187,7 @@ namespace task_scheduler
         /// Initializes a new instance of the <see cref="base_task"/> class.
         /// </summary>
         /// <param name="_task_graph">The task graph.</param>
-        base_task(task_graph_type &_task_graph);
+        base_task(task_graph_type &_task_graph, size_t _max_data_parallel_workload = 0);
         /// <summary>
         /// Finalizes an instance of the <see cref="base_task"/> class.
         /// </summary>
@@ -278,10 +288,11 @@ namespace task_scheduler
     template < class TMemInterface > base_task< TMemInterface >::persistent_container::~persistent_container() {}
 
     template < class TMemInterface >
-    base_task< TMemInterface >::transient_container::transient_container()
+    base_task< TMemInterface >::transient_container::transient_container(size_t _max_data_parallel_workload)
         : work_queue(nullptr)
         , num_working(0)
         , task_time(0ms)
+        , data_workload(_max_data_parallel_workload)
     {
         work_queue = new work_queue_type(&work_allocator);
     }
@@ -300,6 +311,7 @@ namespace task_scheduler
         {
             instrument< void, task_type, void (task_type::*)(function_type*) >(transient.task_time, this, &task_type::run_internal, work_function);
             //(*work_function)();
+            ++transient.num_runned;
             return true;
         }
         return false;
@@ -331,8 +343,9 @@ namespace task_scheduler
     }
 
     template < class TMemInterface >
-    base_task< TMemInterface >::base_task(task_graph_type &_task_graph)
+    base_task< TMemInterface >::base_task(task_graph_type &_task_graph, size_t _max_data_parallel_workload)
         : task_graph(_task_graph)
+        , transient(_max_data_parallel_workload)
     {
     }
 

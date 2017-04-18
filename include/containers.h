@@ -456,7 +456,7 @@ namespace task_scheduler
         typedef TDataStructure super;
 
       public:
-        guarded();
+        guarded(size_t _fixed_size);
         T &operator[](size_t _index);
         T &at(size_t _index);
         T &front();
@@ -472,12 +472,15 @@ namespace task_scheduler
         void lock(T *&_locked_data);
         void unlock(T *&_unlocked_data);
         bool is_locked();
+        void _Reallocate(typename TDataStructure::size_type _Count);
     };
 
     template < typename T, class TDataStructure, class TMemInterface >
-    guarded< T, TDataStructure, TMemInterface >::guarded()
+    guarded< T, TDataStructure, TMemInterface >::guarded(size_t _fixed_size)
         : read_locked(false)
+        , TDataStructure(_fixed_size)
     {
+        
     }
 
     template < typename T, class TDataStructure, class TMemInterface >
@@ -492,6 +495,7 @@ namespace task_scheduler
     template < typename T, class TDataStructure, class TMemInterface >
     void guarded< T, TDataStructure, TMemInterface >::unlock(T *&_unlocked_data)
     {
+        //Array could have been resized, reserve a larger amount of elements
         assert(super::data() == _unlocked_data);
         _unlocked_data = nullptr;
         bool previous_value = read_locked.exchange(false);
@@ -549,6 +553,14 @@ namespace task_scheduler
     {
         assert(super::size() > 0);
         return at(super::size() - 1);
+    }
+
+    template < typename T, class TDataStructure, class TMemInterface >
+    void guarded< T, TDataStructure, TMemInterface >::_Reallocate(typename TDataStructure::size_type _Count)
+    {
+        assert(!is_locked()); //Data structure is being resized, the lock is no longer valid
+                              //Increase the initial size of the data structure
+        super::_Reallocate(_Count)
     }
 
     template < typename T, class TMemInterface >

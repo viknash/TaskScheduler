@@ -300,6 +300,7 @@ namespace task_scheduler
             task->transient.start_gate = 0;
             task->transient.num_working = 0;
             task->transient.task_time = 0ms;
+            task->transient.num_runned = 0;
         }
         for (auto task : *task_list)
         {
