@@ -309,6 +309,18 @@ namespace task_scheduler
         function_type *work_function = nullptr;
         if (transient.work_queue->pop_front(work_function))
         {
+            if (transient.data_workload.size() && !transient.data_workload.is_locked())
+            {
+                lock_free_batch_dispatcher< void *, guarded_vector< void *, default_mem_interface >, default_mem_interface >
+                    dispatcher(transient.data_workload);
+                size_t requested_batch_size = 1;
+                size_t returned_batch_size = 0;
+                //void** data = dispatcher.get_next_batch(requested_batch_size, returned_batch_size);
+                //if (data)
+                //{
+                //    auto new_task = new task_type(task_graph);
+                //}
+            }
             instrument< void, task_type, void (task_type::*)(function_type*) >(transient.task_time, this, &task_type::run_internal, work_function);
             //(*work_function)();
             ++transient.num_runned;

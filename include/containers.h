@@ -463,6 +463,9 @@ namespace task_scheduler
         T &back();
         void push_back(const T &_new_item);
         void clear();
+        typename TDataStructure::size_type size() const _NOEXCEPT;
+
+        bool is_locked();
 
         template < typename T, class TDataType, class TMemInterface > friend class lock_free_batch_dispatcher;
 
@@ -471,7 +474,6 @@ namespace task_scheduler
 
         void lock(T *&_locked_data);
         void unlock(T *&_unlocked_data);
-        bool is_locked();
         void _Reallocate(typename TDataStructure::size_type _Count);
     };
 
@@ -561,6 +563,12 @@ namespace task_scheduler
         assert(!is_locked()); //Data structure is being resized, the lock is no longer valid
                               //Increase the initial size of the data structure
         super::_Reallocate(_Count)
+    }
+
+    template < typename T, class TDataStructure, class TMemInterface >
+    typename TDataStructure::size_type guarded< T, TDataStructure, TMemInterface >::size() const _NOEXCEPT
+    {
+        return super::size();
     }
 
     template < typename T, class TMemInterface >
@@ -804,9 +812,10 @@ namespace task_scheduler
     {
         assert(locked_data); // Data has been accessed without locking
         size_t current_batch_index = next_batch_index.fetch_add(_requested_batch_size);
-        if (current_batch_index < data.array_size)
+        size_t array_size = data.size();
+        if (current_batch_index < array_size)
         {
-            _returned_batch_size = std::min(data.array_size - current_batch_index, _requested_batch_size);
+            _returned_batch_size = std::min(array_size - current_batch_index, _requested_batch_size);
             return locked_data + current_batch_index;
         }
         else
