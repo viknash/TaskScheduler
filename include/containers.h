@@ -438,15 +438,15 @@ namespace task_scheduler
         {
         }
 
-        bool push_back(T newData) { return queue.push_back(newData); }
+        virtual bool push_back(T newData) { return queue.push_back(newData); }
 
-        bool push_front(T newData) { return queue.push_front(newData); }
+        //virtual bool push_front(T newData) { return queue.push_front(newData); }
 
-        bool pop_front(T &val) { return queue.pop_front(val); }
+        virtual bool pop_front(T &val) { return queue.pop_front(val); }
 
-        bool pop_back(T &val) { return queue.pop_front(val); }
+        virtual bool pop_back(T &val) { return queue.pop_front(val); }
 
-        bool empty() const { return queue.empty(); }
+        virtual bool empty() const { return queue.empty(); }
 
         TPolicy queue;
     };

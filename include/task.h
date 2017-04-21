@@ -24,6 +24,13 @@
 namespace task_scheduler
 {
 
+    class base_task_events
+    {
+    public:
+        virtual void before_scheduled() = 0;
+        virtual void after_run() = 0;
+    };
+
     template < class TMemInterface > class base_task_graph;
     template < class TMemInterface > class base_thread_pool;
     template < class TMemInterface > struct base_thread;
@@ -33,7 +40,7 @@ namespace task_scheduler
     /// Class base_task.
     /// </summary>
     /// <seealso cref="TMemInterface" />
-    template < class TMemInterface > class base_task : public TMemInterface
+    template < class TMemInterface > class base_task : public TMemInterface, public base_task_events
     {
       public:
         typedef base_task< TMemInterface > task_type;
@@ -56,6 +63,7 @@ namespace task_scheduler
             work_queue_type;
 
         typedef guarded_vector< void *, TMemInterface > data_vector;
+        typedef lock_free_batch_dispatcher< void *, guarded_vector< void *, default_mem_interface >, default_mem_interface > data_dispatcher_type;
 
         /// <summary>
         /// Enum priority_selector
@@ -133,6 +141,10 @@ namespace task_scheduler
             /// Total number of times work function was called
             /// </summary>
             data_vector data_workload;
+            /// <summary>
+            /// Data dispatcher for task work
+            /// </summary>
+            data_dispatcher_type *data_dispatcher;
         };
 
         /// <summary>
@@ -237,6 +249,14 @@ namespace task_scheduler
         /// <param name="_next_task">The next task.</param>
         /// <returns>bool.</returns>
         bool link_task(task_type *_next_task);
+        /// <summary>
+        /// Callback is called when a task is scheduled
+        /// </summary>
+        void before_scheduled();
+        /// <summary>
+        /// Callback is called after a task is run
+        /// </summary>
+        void after_run();
 
         /// <summary>
         /// The debug
@@ -293,6 +313,7 @@ namespace task_scheduler
         , num_working(0)
         , task_time(0ms)
         , data_workload(_max_data_parallel_workload)
+        , data_dispatcher(nullptr)
     {
         work_queue = new work_queue_type(&work_allocator);
     }
@@ -302,6 +323,7 @@ namespace task_scheduler
         assert(work_queue);
         delete work_queue;
         work_queue = nullptr;
+        assert(data_dispatcher == nullptr);
     }
 
     template < class TMemInterface > bool base_task< TMemInterface >::operator()()
@@ -313,8 +335,8 @@ namespace task_scheduler
             {
                 lock_free_batch_dispatcher< void *, guarded_vector< void *, default_mem_interface >, default_mem_interface >
                     dispatcher(transient.data_workload);
-                size_t requested_batch_size = 1;
-                size_t returned_batch_size = 0;
+                //size_t requested_batch_size = 1;
+                //size_t returned_batch_size = 0;
                 //void** data = dispatcher.get_next_batch(requested_batch_size, returned_batch_size);
                 //if (data)
                 //{
@@ -418,6 +440,7 @@ namespace task_scheduler
 
                 // Push task into the best queue
                 uint32_t dependent_task_priority = dependent_task->persistent.task_priority;
+                dependent_task->before_scheduled();
                 do
                 {
                 } while (!best_thread->task_queue[dependent_task_priority]->push_back(dependent_task) &&
@@ -477,4 +500,22 @@ namespace task_scheduler
         transient.work_queue->push_back(&persistent.task_work.back());
         return true;
     }
+
+    template < class TMemInterface >
+    void base_task< TMemInterface >::before_scheduled()
+    {
+        if (transient.data_workload.size() && !transient.data_workload.is_locked())
+        {
+            assert(transient.data_dispatcher == nullptr);
+            transient.data_dispatcher = new data_dispatcher_type(transient.data_workload);
+        }
+    }
+
+    template < class TMemInterface >
+    void base_task< TMemInterface >::after_run()
+    {
+        assert(transient.data_dispatcher);
+        delete transient.data_dispatcher;
+    }
+
 };

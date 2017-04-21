@@ -66,7 +66,7 @@ namespace task_scheduler
         typedef lock_free_queue<
             multi_producer_multi_consumer< task_type *, TMemInterface, task_memory_allocator_type >,
             typename base_task< TMemInterface >::task_type *, TMemInterface, task_memory_allocator_type * >
-            task_queue_type;
+            base_task_queue_type;
         typedef std::unordered_map< string_type, task_type *, std::hash< string_type >, std::equal_to< string_type >,
                                     stl_allocator< std::pair< const string_type, task_type * >, TMemInterface > >
             task_name_to_task_map;
@@ -75,6 +75,14 @@ namespace task_scheduler
         typedef base_thread_pool< TMemInterface > thread_pool;
         typedef task_type *task_list;
         typedef std::function< void(task_type *, void *&) > traversal_function_type;
+
+        class task_queue_type : public base_task_queue_type
+        {
+            typedef base_task_queue_type super;
+        public:
+            task_queue_type(task_memory_allocator_type *allocator);
+            bool push_back(typename base_task< TMemInterface >::task_type * _new_task);
+        };
 
         /// <summary>
         /// Struct persistent_container
@@ -275,6 +283,18 @@ namespace task_scheduler
           /// </summary>
           thread_pool &pool;
     };
+
+    template < class TMemInterface >
+    base_task_graph< TMemInterface >::task_queue_type::task_queue_type(task_memory_allocator_type *allocator)
+        : base_task_queue_type(allocator)
+    {
+    }
+
+    template < class TMemInterface >
+    bool base_task_graph< TMemInterface >::task_queue_type::push_back(typename base_task< TMemInterface >::task_type * _new_task)
+    {
+        return super::push_back(_new_task);
+    }
 
     template < class TMemInterface >
     base_task_graph< TMemInterface >::base_task_graph(thread_pool &_pool)
