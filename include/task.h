@@ -62,9 +62,6 @@ namespace task_scheduler
             function_type *, TMemInterface, work_memory_allocator_type * >
             work_queue_type;
 
-        typedef guarded_vector< void *, TMemInterface > data_vector;
-        typedef lock_free_batch_dispatcher< void *, guarded_vector< void *, default_mem_interface >, default_mem_interface > data_dispatcher_type;
-
         /// <summary>
         /// Enum priority_selector
         /// </summary>
@@ -107,7 +104,7 @@ namespace task_scheduler
             /// <summary>
             /// Initializes a new instance of the <see cref="base_task{TMemInterface}.transient_container"/> struct.
             /// </summary>
-            transient_container(size_t _max_data_parallel_workload);
+            transient_container();
             /// <summary>
             /// Finalizes an instance of the <see cref="base_task{TMemInterface}.transient_container"/> class.
             /// </summary>
@@ -137,14 +134,6 @@ namespace task_scheduler
             /// Total number of times work function was called
             /// </summary>
             std::atomic_int64_t num_runned;
-            /// <summary>
-            /// Total number of times work function was called
-            /// </summary>
-            data_vector data_workload;
-            /// <summary>
-            /// Data dispatcher for task work
-            /// </summary>
-            data_dispatcher_type *data_dispatcher;
         };
 
         /// <summary>
@@ -199,7 +188,7 @@ namespace task_scheduler
         /// Initializes a new instance of the <see cref="base_task"/> class.
         /// </summary>
         /// <param name="_task_graph">The task graph.</param>
-        base_task(task_graph_type &_task_graph, size_t _max_data_parallel_workload = 0);
+        base_task(task_graph_type &_task_graph);
         /// <summary>
         /// Finalizes an instance of the <see cref="base_task"/> class.
         /// </summary>
@@ -225,10 +214,6 @@ namespace task_scheduler
         /// <param name="_percentage_workers">The percentage workers.</param>
         void set_num_workers(percentage_t _percentage_workers);
         /// <summary>
-        /// Finalizes this instance.
-        /// </summary>
-        void finalize();
-        /// <summary>
         /// Kicks the dependent tasks.
         /// </summary>
         void kick_dependent_tasks();
@@ -252,11 +237,11 @@ namespace task_scheduler
         /// <summary>
         /// Callback is called when a task is scheduled
         /// </summary>
-        void before_scheduled();
+        virtual void before_scheduled();
         /// <summary>
         /// Callback is called after a task is run
         /// </summary>
-        void after_run();
+        virtual void after_run();
 
         /// <summary>
         /// The debug
@@ -280,13 +265,158 @@ namespace task_scheduler
         /// </summary>
         thread_unsafe_access_storage add_task_parallel_work_detector;
 
-    private:
+    protected:
         /// <summary>
         /// Calls the working function internally
         /// </summary>
         /// <returns>bool.</returns>
         void run_internal(function_type* _work_function);
     };
+
+    template < class TMemInterface, class TDataType > class base_data_task : public base_task<TMemInterface>
+    {
+        typedef guarded_vector< TDataType, TMemInterface > data_vector;
+        typedef lock_free_batch_dispatcher< TDataType*, guarded_vector< TDataType, TMemInterface >, TMemInterface > data_dispatcher_type;
+
+        struct transient_data_container
+        {
+            /// <summary>
+            /// Initializes a new instance of the <see cref="base_task{TMemInterface}.transient_container"/> struct.
+            /// </summary>
+            transient_data_container(size_t _max_data_parallel_workload);
+            /// <summary>
+            /// Finalizes an instance of the <see cref="base_task{TMemInterface}.transient_container"/> class.
+            /// </summary>
+            ~transient_data_container();
+            /// <summary>
+            /// Total number of times work function was called
+            /// </summary>
+            data_vector data_workload;
+            /// <summary>
+            /// Data dispatcher for task work
+            /// </summary>
+            data_dispatcher_type *data_dispatcher;
+            /// <summary>
+            /// Calculated minimum batch size
+            /// </summary>
+            uint32_t minimum_batch_size;
+        };
+
+    public:
+        /// <summary>
+        /// The transient
+        /// </summary>
+        transient_data_container data_transient;
+        /// <summary>
+        /// Operator()s this instance.
+        /// </summary>
+        /// <returns>bool.</returns>
+        bool operator()() override;
+        /// <summary>
+        /// Initializes a new instance of the <see cref="base_task"/> class.
+        /// </summary>
+        /// <param name="_task_graph">The task graph.</param>
+        base_data_task(task_graph_type &_task_graph, size_t _max_data_parallel_workload = 0);
+        /// <summary>
+        /// Finalizes an instance of the <see cref="base_task"/> class.
+        /// </summary>
+        ~base_data_task();
+        /// <summary>
+        /// Add data parallel work class.
+        /// </summary>
+        /// <param name="_begin">Iterator to the start of a range of elements to add</param>
+        /// <param name="_begin">Iterator to the end of a range of elements to add</param>
+        bool add_data_parallel_work(typename data_vector::iterator _begin, typename data_vector::iterator _end);
+        /// <summary>
+        /// Callback is called when a task is scheduled
+        /// </summary>
+        void before_scheduled() override;
+        /// <summary>
+        /// Callback is called after a task is run
+        /// </summary>
+        void after_run() override;
+    protected:
+        /// <summary>
+        /// Calls the working function internally
+        /// </summary>
+        /// <returns>bool.</returns>
+        void run_internal(function_type* _work_function, TDataType& _data);
+        /// <summary>
+        /// The add task parallel work detector
+        /// </summary>
+        thread_unsafe_access_storage add_data_parallel_work_detector;
+    };
+
+    template < class TMemInterface, class TDataType >
+    base_data_task< TMemInterface, TDataType >::transient_data_container::transient_data_container(size_t _max_data_parallel_workload)
+        : data_workload(_max_data_parallel_workload)
+        , data_dispatcher(nullptr)
+        , minimum_batch_size(1)
+    {
+    }
+
+    template < class TMemInterface, class TDataType >
+    base_data_task< TMemInterface, TDataType >::transient_data_container::~transient_data_container()
+    {
+        assert(data_dispatcher == nullptr);
+    }
+
+    template < class TMemInterface, class TDataType >
+    bool base_data_task< TMemInterface, TDataType >::add_data_parallel_work(typename data_vector::iterator _begin, typename data_vector::iterator _end)
+    {
+        thread_unsafe_access_guard guard(add_data_parallel_work_detector);
+        assert(transient.num_working == 0);
+        assert(persistent.task_work.size() <= 1);
+        transient.data_workload.insert(_begin, _end);
+    }
+
+    template < class TMemInterface, class TDataType >
+    bool base_data_task< TMemInterface, TDataType >::operator()()
+    {
+        assert(data_transient.data_workload.size());
+        assert(!data_transient.data_workload.is_locked());
+        function_type *work_function = nullptr;
+        if (transient.work_queue->pop_front(work_function))
+        {
+            size_t available_batch_size = 0;
+            TDataType* batch = data_transient.data_dispatcher->get_next_batch(data_transient.minimum_batch_size, available_batch_size);
+            if (batch)
+            {
+                for (uint32_t batch_index; batch_index < available_batch_size; batch_index++)
+                {
+                    instrument< void, task_type, void (task_type::*)(function_type*) >(transient.task_time, this, &task_type::run_internal, work_function, *(batch + batch_index));
+                }
+            }
+            ++transient.num_runned;
+            return true;
+        }
+        return false;
+    }
+
+    template < class TMemInterface, class TDataType >
+    void base_data_task< TMemInterface, TDataType >::run_internal(function_type* _work_function, TDataType& _data)
+    {
+        (*_work_function)(_data);
+    }
+
+    template < class TMemInterface, class TDataType >
+    void base_data_task< TMemInterface, TDataType >::before_scheduled()
+    {
+        super::before_scheduled();
+        if (data_transient.data_workload.size() && !data_transient.data_workload.is_locked())
+        {
+            assert(data_transient.data_dispatcher == nullptr);
+            data_transient.data_dispatcher = new data_dispatcher_type(data_transient.data_workload);
+        }
+    }
+
+    template < class TMemInterface, class TDataType >
+    void base_data_task< TMemInterface, TDataType >::after_run()
+    {
+        super::after_run();
+        assert(transient.data_dispatcher);
+        delete transient.data_dispatcher;
+    }
 
     template < class TMemInterface >
     const char *base_task< TMemInterface >::debug_container::priority_to_string(priority_selector priority) const
@@ -308,12 +438,10 @@ namespace task_scheduler
     template < class TMemInterface > base_task< TMemInterface >::persistent_container::~persistent_container() {}
 
     template < class TMemInterface >
-    base_task< TMemInterface >::transient_container::transient_container(size_t _max_data_parallel_workload)
+    base_task< TMemInterface >::transient_container::transient_container()
         : work_queue(nullptr)
         , num_working(0)
         , task_time(0ms)
-        , data_workload(_max_data_parallel_workload)
-        , data_dispatcher(nullptr)
     {
         work_queue = new work_queue_type(&work_allocator);
     }
@@ -323,7 +451,6 @@ namespace task_scheduler
         assert(work_queue);
         delete work_queue;
         work_queue = nullptr;
-        assert(data_dispatcher == nullptr);
     }
 
     template < class TMemInterface > bool base_task< TMemInterface >::operator()()
@@ -331,20 +458,7 @@ namespace task_scheduler
         function_type *work_function = nullptr;
         if (transient.work_queue->pop_front(work_function))
         {
-            if (transient.data_workload.size() && !transient.data_workload.is_locked())
-            {
-                lock_free_batch_dispatcher< void *, guarded_vector< void *, default_mem_interface >, default_mem_interface >
-                    dispatcher(transient.data_workload);
-                //size_t requested_batch_size = 1;
-                //size_t returned_batch_size = 0;
-                //void** data = dispatcher.get_next_batch(requested_batch_size, returned_batch_size);
-                //if (data)
-                //{
-                //    auto new_task = new task_type(task_graph);
-                //}
-            }
             instrument< void, task_type, void (task_type::*)(function_type*) >(transient.task_time, this, &task_type::run_internal, work_function);
-            //(*work_function)();
             ++transient.num_runned;
             return true;
         }
@@ -377,21 +491,12 @@ namespace task_scheduler
     }
 
     template < class TMemInterface >
-    base_task< TMemInterface >::base_task(task_graph_type &_task_graph, size_t _max_data_parallel_workload)
+    base_task< TMemInterface >::base_task(task_graph_type &_task_graph)
         : task_graph(_task_graph)
-        , transient(_max_data_parallel_workload)
     {
     }
 
     template < class TMemInterface > base_task< TMemInterface >::~base_task() { persistent.task_work.clear(); }
-
-    template < class TMemInterface > void base_task< TMemInterface >::finalize()
-    {
-        for (auto &work : persistent.task_work)
-        {
-            transient.work_queue->push_back(&work);
-        }
-    }
 
     template < class TMemInterface > void base_task< TMemInterface >::kick_dependent_tasks()
     {
@@ -504,18 +609,16 @@ namespace task_scheduler
     template < class TMemInterface >
     void base_task< TMemInterface >::before_scheduled()
     {
-        if (transient.data_workload.size() && !transient.data_workload.is_locked())
-        {
-            assert(transient.data_dispatcher == nullptr);
-            transient.data_dispatcher = new data_dispatcher_type(transient.data_workload);
-        }
     }
 
     template < class TMemInterface >
     void base_task< TMemInterface >::after_run()
     {
-        assert(transient.data_dispatcher);
-        delete transient.data_dispatcher;
+        //Repopulate task parallel work functions for next run
+        for (auto &work : persistent.task_work)
+        {
+            transient.work_queue->push_back(&work);
+        }
     }
 
 };

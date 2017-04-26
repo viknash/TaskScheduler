@@ -250,8 +250,6 @@ namespace task_scheduler
 
                 if (run_task->transient.num_working == 0)
                 {
-                    // Reset, Cleanup, ....
-                    instrument< void, task_type, void (task_type::*)() >(scheduling, run_task, &task_type::finalize);
                     // Donate More Tasks
                     instrument< void, task_type, void (task_type::*)() >(scheduling, run_task,
                                                                          &task_type::kick_dependent_tasks);
