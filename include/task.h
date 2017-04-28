@@ -27,7 +27,7 @@ namespace task_scheduler
     class base_task_events
     {
     public:
-        virtual void before_scheduled() = 0;
+        virtual void before_scheduled(thread_num_t _scheduled_on_num_workers) = 0;
         virtual void after_run() = 0;
     };
 
@@ -134,6 +134,10 @@ namespace task_scheduler
             /// Total number of times work function was called
             /// </summary>
             std::atomic_int64_t num_runned;
+            /// <summary>
+            /// Calculated minimum batch size
+            /// </summary>
+            uint32_t minimum_batch_size;
         };
 
         /// <summary>
@@ -182,6 +186,10 @@ namespace task_scheduler
             /// The task work
             /// </summary>
             task_work_vector task_work;
+            /// <summary>
+            /// User set number of workers to use to run this task
+            /// </summary>
+            thread_num_t num_workers;
         };
 
         /// <summary>
@@ -224,25 +232,16 @@ namespace task_scheduler
         /// <returns>bool.</returns>
         bool add_task_parallel_work(function_type _work_function);
         /// <summary>
-        /// Operator()s this instance.
-        /// </summary>
-        /// <returns>bool.</returns>
-        bool operator()();
-        /// <summary>
         /// Links the task.
         /// </summary>
         /// <param name="_next_task">The next task.</param>
         /// <returns>bool.</returns>
         bool link_task(task_type *_next_task);
         /// <summary>
-        /// Callback is called when a task is scheduled
+        /// Operator()s this instance.
         /// </summary>
-        virtual void before_scheduled();
-        /// <summary>
-        /// Callback is called after a task is run
-        /// </summary>
-        virtual void after_run();
-
+        /// <returns>bool.</returns>
+        bool operator()();
         /// <summary>
         /// The debug
         /// </summary>
@@ -266,157 +265,27 @@ namespace task_scheduler
         thread_unsafe_access_storage add_task_parallel_work_detector;
 
     protected:
+        // Overridable functions
         /// <summary>
         /// Calls the working function internally
         /// </summary>
         /// <returns>bool.</returns>
-        void run_internal(function_type* _work_function);
-    };
-
-    template < class TMemInterface, class TDataType > class base_data_task : public base_task<TMemInterface>
-    {
-        typedef guarded_vector< TDataType, TMemInterface > data_vector;
-        typedef lock_free_batch_dispatcher< TDataType*, guarded_vector< TDataType, TMemInterface >, TMemInterface > data_dispatcher_type;
-
-        struct transient_data_container
-        {
-            /// <summary>
-            /// Initializes a new instance of the <see cref="base_task{TMemInterface}.transient_container"/> struct.
-            /// </summary>
-            transient_data_container(size_t _max_data_parallel_workload);
-            /// <summary>
-            /// Finalizes an instance of the <see cref="base_task{TMemInterface}.transient_container"/> class.
-            /// </summary>
-            ~transient_data_container();
-            /// <summary>
-            /// Total number of times work function was called
-            /// </summary>
-            data_vector data_workload;
-            /// <summary>
-            /// Data dispatcher for task work
-            /// </summary>
-            data_dispatcher_type *data_dispatcher;
-            /// <summary>
-            /// Calculated minimum batch size
-            /// </summary>
-            uint32_t minimum_batch_size;
-        };
-
-    public:
-        /// <summary>
-        /// The transient
-        /// </summary>
-        transient_data_container data_transient;
-        /// <summary>
-        /// Operator()s this instance.
-        /// </summary>
-        /// <returns>bool.</returns>
-        bool operator()() override;
-        /// <summary>
-        /// Initializes a new instance of the <see cref="base_task"/> class.
-        /// </summary>
-        /// <param name="_task_graph">The task graph.</param>
-        base_data_task(task_graph_type &_task_graph, size_t _max_data_parallel_workload = 0);
-        /// <summary>
-        /// Finalizes an instance of the <see cref="base_task"/> class.
-        /// </summary>
-        ~base_data_task();
-        /// <summary>
-        /// Add data parallel work class.
-        /// </summary>
-        /// <param name="_begin">Iterator to the start of a range of elements to add</param>
-        /// <param name="_begin">Iterator to the end of a range of elements to add</param>
-        bool add_data_parallel_work(typename data_vector::iterator _begin, typename data_vector::iterator _end);
+        virtual bool run() = 0;
         /// <summary>
         /// Callback is called when a task is scheduled
         /// </summary>
-        void before_scheduled() override;
+        virtual void before_scheduled(thread_num_t _scheduled_on_num_workers);
         /// <summary>
         /// Callback is called after a task is run
         /// </summary>
-        void after_run() override;
-    protected:
+        virtual void after_run();
+
         /// <summary>
-        /// Calls the working function internally
+        /// Gets the best number of workers for the task every frame
         /// </summary>
-        /// <returns>bool.</returns>
-        void run_internal(function_type* _work_function, TDataType& _data);
-        /// <summary>
-        /// The add task parallel work detector
-        /// </summary>
-        thread_unsafe_access_storage add_data_parallel_work_detector;
+        /// <param name="_num_workers">The number workers.</param>
+        virtual thread_num_t get_recommended_num_workers();
     };
-
-    template < class TMemInterface, class TDataType >
-    base_data_task< TMemInterface, TDataType >::transient_data_container::transient_data_container(size_t _max_data_parallel_workload)
-        : data_workload(_max_data_parallel_workload)
-        , data_dispatcher(nullptr)
-        , minimum_batch_size(1)
-    {
-    }
-
-    template < class TMemInterface, class TDataType >
-    base_data_task< TMemInterface, TDataType >::transient_data_container::~transient_data_container()
-    {
-        assert(data_dispatcher == nullptr);
-    }
-
-    template < class TMemInterface, class TDataType >
-    bool base_data_task< TMemInterface, TDataType >::add_data_parallel_work(typename data_vector::iterator _begin, typename data_vector::iterator _end)
-    {
-        thread_unsafe_access_guard guard(add_data_parallel_work_detector);
-        assert(transient.num_working == 0);
-        assert(persistent.task_work.size() <= 1);
-        transient.data_workload.insert(_begin, _end);
-    }
-
-    template < class TMemInterface, class TDataType >
-    bool base_data_task< TMemInterface, TDataType >::operator()()
-    {
-        assert(data_transient.data_workload.size());
-        assert(!data_transient.data_workload.is_locked());
-        function_type *work_function = nullptr;
-        if (transient.work_queue->pop_front(work_function))
-        {
-            size_t available_batch_size = 0;
-            TDataType* batch = data_transient.data_dispatcher->get_next_batch(data_transient.minimum_batch_size, available_batch_size);
-            if (batch)
-            {
-                for (uint32_t batch_index; batch_index < available_batch_size; batch_index++)
-                {
-                    instrument< void, task_type, void (task_type::*)(function_type*) >(transient.task_time, this, &task_type::run_internal, work_function, *(batch + batch_index));
-                }
-            }
-            ++transient.num_runned;
-            return true;
-        }
-        return false;
-    }
-
-    template < class TMemInterface, class TDataType >
-    void base_data_task< TMemInterface, TDataType >::run_internal(function_type* _work_function, TDataType& _data)
-    {
-        (*_work_function)(_data);
-    }
-
-    template < class TMemInterface, class TDataType >
-    void base_data_task< TMemInterface, TDataType >::before_scheduled()
-    {
-        super::before_scheduled();
-        if (data_transient.data_workload.size() && !data_transient.data_workload.is_locked())
-        {
-            assert(data_transient.data_dispatcher == nullptr);
-            data_transient.data_dispatcher = new data_dispatcher_type(data_transient.data_workload);
-        }
-    }
-
-    template < class TMemInterface, class TDataType >
-    void base_data_task< TMemInterface, TDataType >::after_run()
-    {
-        super::after_run();
-        assert(transient.data_dispatcher);
-        delete transient.data_dispatcher;
-    }
 
     template < class TMemInterface >
     const char *base_task< TMemInterface >::debug_container::priority_to_string(priority_selector priority) const
@@ -432,6 +301,7 @@ namespace task_scheduler
         , sub_graph(nullptr)
         , rank(0)
         , thread_affinity(0)
+        , num_workers(std::numeric_limits<thread_num_t>::max())
     {
     }
 
@@ -442,6 +312,7 @@ namespace task_scheduler
         : work_queue(nullptr)
         , num_working(0)
         , task_time(0ms)
+        , minimum_batch_size(1)
     {
         work_queue = new work_queue_type(&work_allocator);
     }
@@ -451,23 +322,6 @@ namespace task_scheduler
         assert(work_queue);
         delete work_queue;
         work_queue = nullptr;
-    }
-
-    template < class TMemInterface > bool base_task< TMemInterface >::operator()()
-    {
-        function_type *work_function = nullptr;
-        if (transient.work_queue->pop_front(work_function))
-        {
-            instrument< void, task_type, void (task_type::*)(function_type*) >(transient.task_time, this, &task_type::run_internal, work_function);
-            ++transient.num_runned;
-            return true;
-        }
-        return false;
-    }
-
-    template < class TMemInterface > void base_task< TMemInterface >::run_internal(function_type* _work_function)
-    {
-        (*_work_function)();
     }
 
     template < class TMemInterface > void base_task< TMemInterface >::set_thread_affinity(thread_mask_int_t _mask)
@@ -496,6 +350,12 @@ namespace task_scheduler
     {
     }
 
+    template < class TMemInterface >
+    bool base_task< TMemInterface >::operator()()
+    {
+        return this->run();
+    }
+
     template < class TMemInterface > base_task< TMemInterface >::~base_task() { persistent.task_work.clear(); }
 
     template < class TMemInterface > void base_task< TMemInterface >::kick_dependent_tasks()
@@ -516,48 +376,73 @@ namespace task_scheduler
         {
             if (--dependent_task->transient.start_gate == 0)
             {
-                // Find lowest ranking queue, aka best queue and increment its rank with dependent task rank
-                thread_type *best_thread = nullptr;
-                rank_type best_rank = std::numeric_limits< rank_type >::max();
-                do
-                {
-                    best_thread = nullptr;
-                    best_rank = std::numeric_limits< rank_type >::max();
-                    thread_index_type current_thread_index = best_search_index;
-                    for (thread_num_t iterations = 0; iterations < task_graph.pool.num_threads;
-                         ++current_thread_index, ++iterations)
-                    {
-                        if (!current_thread_index.is_set(dependent_task->persistent.thread_affinity))
-                            continue; // Skip threads the task should not run on
-
-                        int64_t current_thread_rank =
-                            task_graph.pool.queue_rank[dependent_task->persistent.task_priority][current_thread_index]
-                                .load();
-                        if (current_thread_rank < best_rank)
-                        {
-                            best_rank = current_thread_rank;
-                            best_thread = task_graph.pool.threads[current_thread_index];
-                        }
-                    }
-                } while (
-                    !task_graph.pool.queue_rank[dependent_task->persistent.task_priority][best_thread->thread_index]
-                         .compare_exchange_weak(best_rank, best_rank + dependent_task->persistent.rank));
-
-                // Push task into the best queue
+                thread_num_t requested_workers = dependent_task->get_recommended_num_workers();
                 uint32_t dependent_task_priority = dependent_task->persistent.task_priority;
-                dependent_task->before_scheduled();
-                do
+                
+                //Search for best threads to run on only we do not require all workers
+                if (requested_workers < task_graph.pool.num_threads)
                 {
-                } while (!best_thread->task_queue[dependent_task_priority]->push_back(dependent_task) &&
-                         ++dependent_task_priority < task_type::num_priority);
-                assert(dependent_task_priority < task_type::num_priority);
+                    dependent_task->before_scheduled(requested_workers);
 
-                ts_print("schedule " << dependent_task->debug.task_name << " -> "
-                                     << uint32_t(best_thread->thread_index));
-                // Wake up thread if its sleeping
-                best_thread->wake_up();
+                    // Find lowest ranking queue, aka best queue and increment its rank with dependent task rank
+                    thread_type *best_thread = nullptr;
+                    rank_type best_rank = std::numeric_limits< rank_type >::max();
+                    do
+                    {
+                        best_thread = nullptr;
+                        best_rank = std::numeric_limits< rank_type >::max();
+                        thread_index_type current_thread_index = best_search_index;
+                        for (thread_num_t iterations = 0; iterations < task_graph.pool.num_threads;
+                            ++current_thread_index, ++iterations)
+                        {
+                            if (!current_thread_index.is_set(dependent_task->persistent.thread_affinity))
+                                continue; // Skip threads the task should not run on
 
-                reduce_starvation(new_search_index) best_search_index = best_thread->thread_index;
+                            int64_t current_thread_rank =
+                                task_graph.pool.queue_rank[dependent_task->persistent.task_priority][current_thread_index]
+                                .load();
+                            if (current_thread_rank < best_rank)
+                            {
+                                best_rank = current_thread_rank;
+                                best_thread = task_graph.pool.threads[current_thread_index];
+                            }
+                        }
+                    } while (
+                        !task_graph.pool.queue_rank[dependent_task->persistent.task_priority][best_thread->thread_index]
+                        .compare_exchange_weak(best_rank, best_rank + dependent_task->persistent.rank));
+
+                    // Push task into the best queue
+                    uint32_t current_task_priority = dependent_task_priority;
+                    do
+                    {
+                    } while (!best_thread->task_queue[current_task_priority]->push_back(dependent_task) &&
+                        ++current_task_priority < task_type::num_priority);
+
+                    ts_print("schedule " << dependent_task->debug.task_name << " -> "
+                        << uint32_t(best_thread->thread_index));
+                    // Wake up thread if its sleeping
+                    best_thread->wake_up();
+
+                    reduce_starvation(new_search_index) best_search_index = best_thread->thread_index;
+                }
+                else
+                {
+                    //Schedule task on all threads
+                    dependent_task->before_scheduled(task_graph.pool.num_threads);
+                    for (thread_num_t current_thread_index = 0; current_thread_index < task_graph.pool.num_threads;
+                        ++current_thread_index)
+                    {
+                        uint32_t current_task_priority = dependent_task_priority;
+                        do
+                        {
+                        } while (!task_graph.pool.threads[current_thread_index]->task_queue[current_task_priority]->push_back(dependent_task) &&
+                            ++current_task_priority < task_type::num_priority);
+                        ts_print("schedule " << dependent_task->debug.task_name << " -> "
+                            << uint32_t(task_graph.pool.threads[current_thread_index]->thread_index));
+                    }
+
+                    //Note: We do not modify best_search_index here
+                }
             }
         }
 
@@ -607,8 +492,9 @@ namespace task_scheduler
     }
 
     template < class TMemInterface >
-    void base_task< TMemInterface >::before_scheduled()
+    void base_task< TMemInterface >::before_scheduled(thread_num_t _scheduled_on_num_workers)
     {
+        (void)_scheduled_on_num_workers;
     }
 
     template < class TMemInterface >
@@ -619,6 +505,12 @@ namespace task_scheduler
         {
             transient.work_queue->push_back(&work);
         }
+    }
+
+    template < class TMemInterface >
+    thread_num_t base_task< TMemInterface >::get_recommended_num_workers()
+    {
+        return persistent.num_workers;
     }
 
 };

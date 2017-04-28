@@ -23,13 +23,14 @@
 namespace task_scheduler
 {
 
-    template < class TMemInterface > class base_task;
     template < class TMemInterface > class base_thread_pool;
 
     template < class TMemInterface > class base_task_graph_helper : public TMemInterface
     {
       public:
-        typedef base_task< TMemInterface > task_type;
+        typedef typename base_task<TMemInterface>::task_type task_type;
+        typedef typename base_worker_task<TMemInterface>::worker_task_type worker_task_type;
+
         typedef std::basic_string< char, std::char_traits< char >, stl_allocator< char, TMemInterface > > string_type;
         typedef std::vector< task_type *, stl_allocator< task_type *, TMemInterface > > task_vector;
         typedef base_thread_pool< TMemInterface > thread_pool;
@@ -82,7 +83,7 @@ namespace task_scheduler
                 istringstream_type;
             istringstream_type iss(line);
             string_type token;
-            auto new_task = new task_type(task_graph);
+            auto new_task = new worker_task_type(task_graph);
             unsigned int _task_file_field = 0;
             while (getline(iss, token, ','))
             {

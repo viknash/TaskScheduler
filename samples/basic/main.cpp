@@ -17,6 +17,8 @@
 #include "containers.h"
 #include "profile.h"
 #include "task.h"
+#include "datatask.h"
+#include "workertask.h"
 #include "taskgraph.h"
 #include "thread.h"
 #include "threadpool.h"
