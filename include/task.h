@@ -181,7 +181,7 @@ namespace task_scheduler
             /// <summary>
             /// The thread affinity
             /// </summary>
-            int64_t thread_affinity;
+            uint64_t thread_affinity;
             /// <summary>
             /// The task work
             /// </summary>
@@ -243,6 +243,11 @@ namespace task_scheduler
         /// <returns>bool.</returns>
         bool operator()();
         /// <summary>
+        /// Gets the best number of workers for the task every frame
+        /// </summary>
+        /// <param name="_num_workers">The number workers.</param>
+        virtual thread_num_t get_recommended_num_workers();
+        /// <summary>
         /// The debug
         /// </summary>
         debug_container debug;
@@ -280,11 +285,6 @@ namespace task_scheduler
         /// </summary>
         virtual void after_run();
 
-        /// <summary>
-        /// Gets the best number of workers for the task every frame
-        /// </summary>
-        /// <param name="_num_workers">The number workers.</param>
-        virtual thread_num_t get_recommended_num_workers();
     };
 
     template < class TMemInterface >

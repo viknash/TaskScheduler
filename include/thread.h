@@ -224,7 +224,7 @@ namespace task_scheduler
         using namespace std;
         profile_time scheduling(0ms), sleeping(0ms), working(0ms);
 
-        ts_print("start");
+        ts_print("ready");
 
         while (pool.setup.request_exit != thread_pool::request_stop)
         {

@@ -594,12 +594,17 @@ namespace task_scheduler
     void base_task_graph< TMemInterface >::queue_task(task_type *_task, thread_num_t _num_threads_to_wake_up)
     {
         uint32_t priority = _task->persistent.task_priority;
-        do
-        {
-        } while (!transient.task_queue[priority]->push_back(_task) && ++priority < task_type::num_priority);
-        assert(priority < task_type::num_priority);
 
-        pool.wake_up(_num_threads_to_wake_up);
+        thread_num_t requested_workers = min(min(_task->get_recommended_num_workers(), _num_threads_to_wake_up), pool.num_threads);
+        for (thread_num_t count = 0; count < requested_workers; ++count)
+        {
+            do
+            {
+            } while (!transient.task_queue[priority]->push_back(_task) && ++priority < task_type::num_priority);
+            assert(priority < task_type::num_priority);
+        }
+
+        pool.wake_up(_num_threads_to_wake_up, _task->persistent.thread_affinity);
     }
 
     template < class TMemInterface >

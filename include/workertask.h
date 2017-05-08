@@ -70,6 +70,7 @@ namespace task_scheduler
     bool base_worker_task< TMemInterface >::run()
     {
         function_type *work_function = nullptr;
+        int64_t last_num_runned = transient.num_runned;
         while (!transient.work_queue->empty())
         {
             if (transient.work_queue->pop_front(work_function))
@@ -78,7 +79,7 @@ namespace task_scheduler
                 ++transient.num_runned;
             }
         }
-        return transient.num_runned ? true : false;
+        return transient.num_runned > last_num_runned ? true : false;
     }
 
     template < class TMemInterface >

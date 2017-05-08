@@ -96,7 +96,7 @@ namespace task_scheduler
           /// Wakes up.
           /// </summary>
           /// <param name="num_threads_to_wake_up">The number threads to wake up.</param>
-          void wake_up(thread_num_t num_threads_to_wake_up = max_num_threads);
+          void wake_up(thread_num_t _num_threads_to_wake_up = max_num_threads, uint64_t _thread_affinity_mask = std::numeric_limits<uint64_t>::max());
           /// <summary>
           /// Gets the current thread.
           /// </summary>
@@ -188,14 +188,18 @@ namespace task_scheduler
     }
 
     template < class TMemInterface >
-    void base_thread_pool< TMemInterface >::wake_up(thread_num_t _num_threads_to_wake_up)
+    void base_thread_pool< TMemInterface >::wake_up(thread_num_t _num_threads_to_wake_up, uint64_t _thread_affinity_mask)
     {
         _num_threads_to_wake_up = std::min(num_threads, _num_threads_to_wake_up);
         reduce_starvation(always_different_thread_woken_up_first) static thread_index_type next_thread_index(this, 0);
-        for (uint32_t iterations = 0; iterations < _num_threads_to_wake_up; ++next_thread_index, ++iterations)
+        for (uint32_t iterations = 0, woke_up = 0; woke_up < _num_threads_to_wake_up && iterations < num_threads; ++next_thread_index, ++iterations)
         {
+            if (!next_thread_index.is_set(_thread_affinity_mask))
+                continue; // Skip threads the task should not run on
             threads[next_thread_index]->wake_up();
+            ++woke_up;
         }
+
         reduce_starvation(always_different_thread_woken_up_first)++ next_thread_index;
     }
 
