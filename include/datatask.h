@@ -27,6 +27,7 @@ namespace task_scheduler
         typedef base_data_task< TDataType, TMemInterface > data_task_type;
         typedef guarded_vector< TDataType, TMemInterface > data_vector;
         typedef lock_free_batch_dispatcher< TDataType*, guarded_vector< TDataType, TMemInterface >, TMemInterface > data_dispatcher_type;
+        typedef base_task<TMemInterface> super;
 
         struct transient_data_container
         {
@@ -61,7 +62,7 @@ namespace task_scheduler
         /// Initializes a new instance of the <see cref="base_task"/> class.
         /// </summary>
         /// <param name="_task_graph">The task graph.</param>
-        base_data_task(task_graph_type &_task_graph, size_t _max_data_parallel_workload = 0);
+        base_data_task(typename super::task_graph_type &_task_graph, size_t _max_data_parallel_workload = 0);
         /// <summary>
         /// Finalizes an instance of the <see cref="base_task"/> class.
         /// </summary>
@@ -97,7 +98,7 @@ namespace task_scheduler
         /// Calls the working function internally
         /// </summary>
         /// <returns>bool.</returns>
-        void run_internal(function_type* _work_function, TDataType& _data);
+        void run_internal(typename super::function_type* _work_function, TDataType& _data);
         /// <summary>
         /// The add task parallel work detector
         /// </summary>
@@ -118,7 +119,7 @@ namespace task_scheduler
     }
 
     template < class TMemInterface, class TDataType >
-    base_data_task< TMemInterface, TDataType >::base_data_task(task_graph_type &_task_graph, size_t _max_data_parallel_workload)
+    base_data_task< TMemInterface, TDataType >::base_data_task(typename super::task_graph_type &_task_graph, size_t _max_data_parallel_workload)
         : super(_task_graph)
         , data_transient(_max_data_parallel_workload)
     {
@@ -133,9 +134,9 @@ namespace task_scheduler
     bool base_data_task< TMemInterface, TDataType >::add_data_parallel_work(typename data_vector::iterator _begin, typename data_vector::iterator _end)
     {
         thread_unsafe_access_guard guard(add_data_parallel_work_detector);
-        assert(transient.num_working == 0);
-        assert(persistent.task_work.size() <= 1);
-        transient.data_workload.insert(_begin, _end);
+        assert(super::transient.num_working == 0);
+        assert(super::persistent.task_work.size() <= 1);
+        super::transient.data_workload.insert(_begin, _end);
     }
 
     template < class TMemInterface, class TDataType >
@@ -143,26 +144,26 @@ namespace task_scheduler
     {
         assert(data_transient.data_workload.size());
         assert(!data_transient.data_workload.is_locked());
-        function_type *work_function = nullptr;
-        if (transient.work_queue->pop_front(work_function))
+        typename super::function_type *work_function = nullptr;
+        if (super::transient.work_queue->pop_front(this->work_function))
         {
             size_t available_batch_size = 0;
             TDataType* batch = data_transient.data_dispatcher->get_next_batch(data_transient.minimum_batch_size, available_batch_size);
             if (batch)
             {
-                for (uint32_t batch_index; batch_index < available_batch_size; batch_index++)
+                for (uint32_t batch_index; batch_index < available_batch_size; ++batch_index)
                 {
-                    instrument< void, data_task_type, void (data_task_type::*)(function_type*) >(transient.task_time, this, &data_task_type::run_internal, work_function, *(batch + batch_index));
+                    instrument< void, data_task_type, void (data_task_type::*)(typename super::function_type*) >(super::transient.task_time, this, &data_task_type::run_internal, work_function, *(batch + batch_index));
                 }
             }
-            ++transient.num_runned;
+            ++super::transient.num_runned;
             return true;
         }
         return false;
     }
 
     template < class TMemInterface, class TDataType >
-    void base_data_task< TMemInterface, TDataType >::run_internal(function_type* _work_function, TDataType& _data)
+    void base_data_task< TMemInterface, TDataType >::run_internal(typename super::function_type* _work_function, TDataType& _data)
     {
         (*_work_function)(_data);
     }
@@ -172,11 +173,11 @@ namespace task_scheduler
     {
         super::before_scheduled();
 
-        assert(persistent.task_work.size() == 1); //Only supports one work function
-        assert(transient.work_queue->empty());
+        assert(super::persistent.task_work.size() == 1); //Only supports one work function
+        assert(super::transient.work_queue->empty());
         for (thread_num_t count = 0; count < _scheduled_on_num_workers; ++count)
         {
-            transient.work_queue->push_back(persistent.task_work[0]);
+            super::transient.work_queue->push_back(super::persistent.task_work[0]);
         }
 
         if (data_transient.data_workload.size() && !data_transient.data_workload.is_locked())
@@ -190,17 +191,17 @@ namespace task_scheduler
     void base_data_task< TMemInterface, TDataType >::after_run()
     {
         super::after_run();
-        assert(persistent.task_work.size() == 1); //Only supports one work function
-        assert(transient.work_queue->empty());
-        assert(transient.data_dispatcher);
-        delete transient.data_dispatcher;
+        assert(super::persistent.task_work.size() == 1); //Only supports one work function
+        assert(super::transient.work_queue->empty());
+        assert(super::transient.data_dispatcher);
+        delete super::transient.data_dispatcher;
     }
 
     template < class TMemInterface, class TDataType >
     thread_num_t base_data_task< TMemInterface, TDataType >::get_recommended_num_workers()
     {
         size_t optimum_num_threads = data_transient.data_workload.size() / data_transient.minimum_batch_size;
-        return std::min(persistent.num_workers, optimum_num_threads);
+        return std::min(super::persistent.num_workers, optimum_num_threads);
     }
 
 }

@@ -11,6 +11,7 @@
 
 #include <thread>
 
+
 /// <summary>
 /// The task_scheduler namespace.
 /// </summary>
@@ -68,4 +69,29 @@ namespace task_scheduler
         profile_timer profile(_profileTime);
         return (_classType->*_func)(std::forward< TArgs >(_params)...);
     }
+
+    class profile
+    {
+    public:
+        ts_itt(typedef __itt_heap_function* handle;);
+        const handle invalid_handle = nullptr;
+
+        static handle heap_function_create(const tchar_t* _name, tchar_t* _domain)
+        {
+            handle hnd;
+            hnd = ts_itt(&__itt_heap_function_create(_name, _domain););
+            return hnd;
+        }
+
+        static void heap_allocate_begin(handle _heap, size_t _size, bool _initialized)
+        {
+            ts_itt(__itt_heap_allocate_begin(*_heap, _size, _initialized ? 1 : 0););
+        }
+
+        static void heap_allocate_end(handle _heap, void** _memory_allocation, size_t _size, bool _initialized)
+        {
+            ts_itt(heap_allocate_end(*_heap, _memory_allocation, _size, _initialized ? 1 : 0););
+        }
+
+    };
 };

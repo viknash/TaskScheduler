@@ -82,6 +82,7 @@ namespace task_scheduler
         public:
             task_queue_type(task_memory_allocator_type *allocator);
             bool push_back(typename base_task< TMemInterface >::task_type * _new_task);
+            virtual ~task_queue_type() {}
         };
 
         /// <summary>
@@ -305,6 +306,8 @@ namespace task_scheduler
 
     template < class TMemInterface > void base_task_graph< TMemInterface >::setup(sub_graph_type *graph)
     {
+        using namespace std::chrono_literals;
+
         task_vector *task_list;
         if (graph)
         {
@@ -593,6 +596,8 @@ namespace task_scheduler
     template < class TMemInterface >
     void base_task_graph< TMemInterface >::queue_task(task_type *_task, thread_num_t _num_threads_to_wake_up)
     {
+        using namespace std;
+
         uint32_t priority = _task->persistent.task_priority;
 
         thread_num_t requested_workers = min(min(_task->get_recommended_num_workers(), _num_threads_to_wake_up), pool.num_threads);

@@ -32,3 +32,11 @@ struct IUnknown;
 #else // defined(ts_windows)
 #define ts_windows_only(x)
 #endif // defined(ts_windows)
+
+
+#if defined(ts_windows)
+#include <tchar.h>
+#define tchar_t TCHAR
+#else
+#define tchar_t char
+#endif //defined(ts_windows)

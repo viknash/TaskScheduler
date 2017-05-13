@@ -448,6 +448,8 @@ namespace task_scheduler
 
         virtual bool empty() const { return queue.empty(); }
 
+        virtual ~lock_free_queue() {}
+
         TPolicy queue;
     };
 
@@ -479,8 +481,8 @@ namespace task_scheduler
 
     template < typename T, class TDataStructure, class TMemInterface >
     guarded< T, TDataStructure, TMemInterface >::guarded(size_t _fixed_size)
-        : read_locked(false)
-        , TDataStructure(_fixed_size)
+        : TDataStructure(_fixed_size)
+        , read_locked(false)
     {
         
     }
@@ -562,7 +564,7 @@ namespace task_scheduler
     {
         assert(!is_locked()); //Data structure is being resized, the lock is no longer valid
                               //Increase the initial size of the data structure
-        super::_Reallocate(_Count)
+        super::_Reallocate(_Count);
     }
 
     template < typename T, class TDataStructure, class TMemInterface >

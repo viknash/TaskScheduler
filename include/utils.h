@@ -15,8 +15,10 @@
 #include <mutex>
 #include <sstream>
 #include <thread>
+#include <tchar.h>
 
 #include "types.h"
+
 
 #if !defined(TASK_SCHEDULER_DEBUG)
 #error("TASK_SCHEDULER_DEBUG is not defined")
@@ -36,6 +38,15 @@
 #define ts_assert(x)
 #else
 #define ts_assert(x) assert(x)
+#endif
+
+#if TASK_SCHEDULER_ENABLE_ITT == 0
+#define ts_itt(x)
+#define _t(x) x
+#else
+#include "ittnotify.h"
+#define ts_itt(x) x
+#define _t(x) _T(x)
 #endif
 
 #define ts_join_string(arg0, arg1) ts_do_join(arg0, arg1)

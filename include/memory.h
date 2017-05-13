@@ -12,6 +12,9 @@
 #include <cassert>
 #include <memory>
 
+#include "utils.h"
+#include "profile.h"
+
 #define ALIGNMENT 16
 
 #pragma pack(ALIGNMENT)
@@ -182,6 +185,8 @@ namespace task_scheduler
         /// <param name="_size">The size.</param>
         /// <returns>The result of the operator.</returns>
         inline void operator delete[](void *_ptr, size_t _size) { operator delete(_ptr, _size); }
+
+        static inline void init();
     };
 
     static_assert(sizeof(default_mem_interface) == 1, "Not an empty base class");
@@ -191,7 +196,9 @@ namespace task_scheduler
     {
         metadata_type metadata = {0};
         metadata.space = _size + sizeof(metadata_type) + _alignment;
+        profile::heap_allocate_begin(profile_handle, metadata.space, false);
         void *raw_pointer = malloc(metadata.space);
+        profile::heap_allocate_end(profile_handle, &raw_pointer, metadata.space, false);
         assert(raw_pointer);
         void *aligned_pointer = std::align(_alignment, _size + sizeof(metadata_type), raw_pointer, metadata.space);
         assert(aligned_pointer);
@@ -209,10 +216,21 @@ namespace task_scheduler
         free(raw_pointer);
     }
 
+    inline void default_mem_interface::init()
+    {
+        profile::heap_function_create(_t("CRT"), _t("Memory"));
+    }
+
+    profile::handle profile_handle;
+
 #define task_scheduler_default_mem_interface_catch_all_allocations()                                                   \
     default_mem_interface gDefaultMemInterface;                                                                        \
     void *operator new(size_t n) { return gDefaultMemInterface.operator new(n); }                                      \
     void operator delete(void *p, size_t n) throw() { gDefaultMemInterface.operator delete(p, n); }                    \
     void *operator new[](size_t n) { return gDefaultMemInterface.operator new[](n); }                                  \
     void operator delete[](void *p, size_t n) throw() { gDefaultMemInterface.operator delete[](p, n); }
+
+#define task_scheduler_default_mem_interface_static_init()                                                             \
+        default_mem_interface::handle = profile::invalid_handle;
+
 };

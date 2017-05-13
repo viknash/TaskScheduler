@@ -1,0 +1,10 @@
+start,normal,Sound,Physics,Graphics,AI,FX,Pathfinding,Culling,Input
+Sound,high,end
+Physics,low,end
+Graphics,realtime,end
+AI,normal,end
+FX,normal,end
+Pathfinding,normal,end
+Culling,normal,end
+Input,normal,end
+end,normal

@@ -78,6 +78,38 @@
 
 			filter "system:windows"
 
+		project "profile"
+			targetname  "profile"
+			language    "C++"
+			kind        "ConsoleApp"
+			location    "samples/profile"
+			includedirs { "samples/profile", "include", "samples", "deps/IntelSEAPI/ittnotify/include" }
+			debugdir    "samples/profile"
+			pchheader   "stdafx.h"
+			pchsource   "samples/profile/stdafx.cpp"
+
+			files
+			{
+				"*.txt", "**.lua","**.md",
+				"samples/profile/**.h", "samples/profile/**.cpp",
+				"include/*.h",
+                "samples/common/**.h", "samples/common/**.cpp"
+			}
+
+			excludes
+			{
+			}
+
+			filter "configurations:debug"
+				targetdir   "bin/debug"
+				debugdir    "samples/profile"
+
+			filter "configurations:release"
+				targetdir   "bin/release"
+				debugdir    "samples/profile"
+
+			filter "system:windows"
+
 	group "tests"
 
 		project "multi_threaded_detector"

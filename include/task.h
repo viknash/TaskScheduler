@@ -43,6 +43,7 @@ namespace task_scheduler
     template < class TMemInterface > class base_task : public TMemInterface, public base_task_events
     {
       public:
+
         typedef base_task< TMemInterface > task_type;
         typedef base_thread< TMemInterface > thread_type;
         typedef base_task_graph< TMemInterface > task_graph_type;
@@ -200,7 +201,7 @@ namespace task_scheduler
         /// <summary>
         /// Finalizes an instance of the <see cref="base_task"/> class.
         /// </summary>
-        ~base_task();
+        virtual ~base_task();
         /// <summary>
         /// Sets the thread affinity.
         /// </summary>
@@ -311,9 +312,11 @@ namespace task_scheduler
     base_task< TMemInterface >::transient_container::transient_container()
         : work_queue(nullptr)
         , num_working(0)
-        , task_time(0ms)
         , minimum_batch_size(1)
     {
+        using namespace std::chrono_literals;
+        
+        task_time = 0ms;
         work_queue = new work_queue_type(&work_allocator);
     }
 
