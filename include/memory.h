@@ -187,18 +187,20 @@ namespace task_scheduler
         inline void operator delete[](void *_ptr, size_t _size) { operator delete(_ptr, _size); }
 
         static inline void init();
+
+    private:
+        static profile::memory* profile_memory;
     };
 
-    static_assert(sizeof(default_mem_interface) == 1, "Not an empty base class");
-
+    static_assert(sizeof(default_mem_interface) == sizeof(profile::memory*), "Not an empty base class");
 
     inline void *default_mem_interface::operator new(size_t _size, size_t _alignment)
     {
         metadata_type metadata = {0};
         metadata.space = _size + sizeof(metadata_type) + _alignment;
-        profile::heap_allocate_begin(profile_handle, metadata.space, false);
+        profile_memory->allocate_begin(metadata.space, false);
         void *raw_pointer = malloc(metadata.space);
-        profile::heap_allocate_end(profile_handle, &raw_pointer, metadata.space, false);
+        profile_memory->allocate_end(&raw_pointer, metadata.space, false);
         assert(raw_pointer);
         void *aligned_pointer = std::align(_alignment, _size + sizeof(metadata_type), raw_pointer, metadata.space);
         assert(aligned_pointer);
@@ -218,10 +220,9 @@ namespace task_scheduler
 
     inline void default_mem_interface::init()
     {
-        profile::heap_function_create(_t("CRT"), _t("Memory"));
+        assert(profile_memory == nullptr);
+        profile_memory = profile::memory::create_instance(_t("CRT"), _t("Memory"));
     }
-
-    profile::handle profile_handle;
 
 #define task_scheduler_default_mem_interface_catch_all_allocations()                                                   \
     default_mem_interface gDefaultMemInterface;                                                                        \
@@ -231,6 +232,6 @@ namespace task_scheduler
     void operator delete[](void *p, size_t n) throw() { gDefaultMemInterface.operator delete[](p, n); }
 
 #define task_scheduler_default_mem_interface_static_init()                                                             \
-        default_mem_interface::handle = profile::invalid_handle;
+    default_mem_interface::profile_memory = nullptr;
 
 };

@@ -222,7 +222,7 @@ namespace task_scheduler
     template < class TMemInterface > void base_thread< TMemInterface >::run()
     {
         using namespace std;
-        profile_time scheduling(0ms), sleeping(0ms), working(0ms);
+        profile::time scheduling(0ms), sleeping(0ms), working(0ms);
 
         ts_print("ready");
 
@@ -235,7 +235,7 @@ namespace task_scheduler
             if (run_task)
             {
                 // Run task_type
-                profile_time task_time(0ms);
+                profile::time task_time(0ms);
                 ++pool.num_working;
                 ++run_task->transient.num_working;
                 while (
