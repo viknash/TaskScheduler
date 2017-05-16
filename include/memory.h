@@ -95,9 +95,9 @@ namespace task_scheduler
         profile_memory->allocate_begin(metadata.space, false);
         void *raw_pointer = malloc(metadata.space);
         profile_memory->allocate_end(&raw_pointer, metadata.space, false);
-        assert(raw_pointer);
+        ts_assert(raw_pointer);
         void *aligned_pointer = std::align(_alignment, _size + sizeof(metadata_type), raw_pointer, metadata.space);
-        assert(aligned_pointer);
+        ts_assert(aligned_pointer);
         *(metadata_type *)((char *)aligned_pointer + _size) = metadata;
         return aligned_pointer;
     }
@@ -114,7 +114,7 @@ namespace task_scheduler
 
     inline void default_mem_interface::init()
     {
-        assert(profile_memory == nullptr);
+        ts_assert(profile_memory == nullptr);
         profile_memory = profile::memory::create_instance(_t("CRT"), _t("Memory"));
     }
 

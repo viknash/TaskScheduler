@@ -33,11 +33,12 @@ struct IUnknown;
 #define ts_windows_only(x)
 #endif // defined(ts_windows)
 
-#if defined(ts_windows)
 #include <string>
 #include <iomanip>
-#include <tchar.h>
 #include <iostream>
+
+#if defined(ts_windows)
+#include <tchar.h>
 #define tchar_t TCHAR
 #define _t(x) _T(x)
 #ifdef _UNICODE 

@@ -73,6 +73,14 @@ namespace task_scheduler
             return (_classType->*_func)(std::forward< TArgs >(_params)...);
         }
 
+        /// <summary>
+        /// Class profile_mem_interface.
+        /// </summary>
+        class profile_mem_interface
+        {
+
+        };
+
         class errors
         {
         public:
@@ -93,16 +101,22 @@ namespace task_scheduler
             inline static void suppress(enum type _error)
             {
                 ts_itt(__itt_suppress_push((unsigned int)_error););
-                //stack.push_front(error);
+                stack.push_front(_error);
             }
 
             inline static void unsuppress(enum type _error)
             {
+                enum type stack_item;
+                stack.pop_front(stack_item);
+                ts_assert(stack_item == _error);
                 ts_itt(__itt_suppress_pop(););
             }
 
-            //typedef lock_free_node_stack< void*, default_mem_interface > stack_type;
-            //static stack_type stack;
+        private:
+            typedef lock_free_node_dispenser< enum type, profile_mem_interface > memory_allocator_type;
+            typedef lock_free_stack< enum type, profile_mem_interface, memory_allocator_type > stack_type;
+            static memory_allocator_type dispenser;
+            static stack_type stack;
         };
 
         inline void suppress()

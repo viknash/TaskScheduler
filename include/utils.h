@@ -15,7 +15,7 @@
 #include <mutex>
 #include <sstream>
 #include <thread>
-#include <tchar.h>
+#include <cassert>
 
 #include "types.h"
 
@@ -100,7 +100,7 @@ namespace task_scheduler
             int64_t new_thread_id = std::hash< std::thread::id >()(std::this_thread::get_id());
             previous_thread_id = storage.last_thread_id.exchange(new_thread_id);
             bool success = previous_thread_id == 0 || previous_thread_id == new_thread_id;
-            assert(success);
+            ts_assert(success);
             return success;
         }
 
@@ -114,7 +114,7 @@ namespace task_scheduler
             int64_t stored_thread_id = storage.last_thread_id.exchange(previous_thread_id);
             int64_t current_thread_id = std::hash< std::thread::id >()(std::this_thread::get_id());
             bool success = stored_thread_id == current_thread_id || stored_thread_id == 0;
-            assert(success);
+            ts_assert(success);
             return success;
         }
 
