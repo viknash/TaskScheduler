@@ -60,7 +60,7 @@ namespace task_scheduler
     {
       public:
         typedef base_task< TMemInterface > task_type;
-        typedef std::basic_string< char, std::char_traits< char >, stl_allocator< char, TMemInterface > > string_type;
+        typedef std::basic_string< tchar_t, std::char_traits< tchar_t >, stl_allocator< tchar_t, TMemInterface > > string_type;
         typedef base_sub_graph< task_type, TMemInterface > sub_graph_type;
         typedef lock_free_node_dispenser< task_type *, TMemInterface > task_memory_allocator_type;
         typedef lock_free_queue<

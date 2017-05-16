@@ -5,9 +5,10 @@
 
 #include "atomics.h"
 #include "cache.h"
-#include "memory.h"
 #include "print.h"
 #include "utils.h"
+#include "alignment.h"
+#include "allocator.h"
 
 namespace task_scheduler
 {
@@ -15,6 +16,11 @@ namespace task_scheduler
     union address {
         volatile void *ptr;
         atomics::type as_atomic;
+    };
+
+    class dummy
+    {
+
     };
 
     template < typename T, class TMemInterface > struct lock_free_node;
@@ -27,8 +33,8 @@ namespace task_scheduler
             atomics::type as_atomic;
         };
     };
-    static_assert(sizeof(atomic_lock_free_node< void *, default_mem_interface >) == sizeof(address),
-                  "size of atomic_lock_free_node is incorrect.");
+    //static_assert(sizeof(atomic_lock_free_node< void *, dummy >) == sizeof(address),
+    //              "size of atomic_lock_free_node is incorrect.");
 
     template < typename T, class TMemInterface > struct class_alignment lock_free_node : public TMemInterface
     {
@@ -45,8 +51,8 @@ namespace task_scheduler
 
         static_assert(sizeof(T) <= sizeof(address), "T must be a POD");
     };
-    static_assert(sizeof(lock_free_node< void *, default_mem_interface >) == sizeof(address) * 2,
-                  "size of atomic_lock_free_node is incorrect.");
+    //static_assert(sizeof(lock_free_node< void *, dummy >) == sizeof(address) * 2,
+    //              "size of atomic_lock_free_node is incorrect.");
 
     template < typename T, class TMemInterface > struct class_alignment atomic_lock_free_node_ptr : public TMemInterface
     {
@@ -83,8 +89,8 @@ namespace task_scheduler
 
         Data data;
     };
-    static_assert(sizeof(atomic_lock_free_node_ptr< bool, default_mem_interface >) == sizeof(address) * 2,
-                  "size of atomic_lock_free_node_ptr is incorrect.");
+    //static_assert(sizeof(atomic_lock_free_node_ptr< bool, dummy >) == sizeof(address) * 2,
+    //              "size of atomic_lock_free_node_ptr is incorrect.");
 
     template < typename T, class TMemInterface > class lock_free_node_stack : public TMemInterface
     {
@@ -145,7 +151,7 @@ namespace task_scheduler
         ts_debug_only(debug_container debug;);
     };
 
-    template < typename T, class TMemInterface = default_mem_interface >
+    template < typename T, class TMemInterface >
     class lock_free_node_dispenser : public TMemInterface
     {
         typedef lock_free_node< T, TMemInterface > node_type;
@@ -491,7 +497,7 @@ namespace task_scheduler
     void guarded< T, TDataStructure, TMemInterface >::lock(T *&_locked_data)
     {
         bool previous_value = read_locked.exchange(true);
-        assert(!previous_value);
+        ts_assert(!previous_value);
         (void)previous_value; // Array has already been locked before
         _locked_data = super::data();
     }
@@ -500,10 +506,10 @@ namespace task_scheduler
     void guarded< T, TDataStructure, TMemInterface >::unlock(T *&_unlocked_data)
     {
         //Array could have been resized, reserve a larger amount of elements
-        assert(super::data() == _unlocked_data);
+        ts_assert(super::data() == _unlocked_data);
         _unlocked_data = nullptr;
         bool previous_value = read_locked.exchange(false);
-        assert(previous_value);
+        ts_assert(previous_value);
         (void)previous_value; // Array not been locked before
     }
 
@@ -516,7 +522,7 @@ namespace task_scheduler
     template < typename T, class TDataStructure, class TMemInterface >
     void guarded< T, TDataStructure, TMemInterface >::push_back(const T &_new_item)
     {
-        assert(!is_locked()); // Array has been locked for reading
+        ts_assert(!is_locked()); // Array has been locked for reading
         if (!is_locked())
         {
             super::push_back(_new_item);
@@ -526,7 +532,7 @@ namespace task_scheduler
     template < typename T, class TDataStructure, class TMemInterface >
     void guarded< T, TDataStructure, TMemInterface >::clear()
     {
-        assert(!is_locked()); // Array has been locked for reading
+        ts_assert(!is_locked()); // Array has been locked for reading
         if (!is_locked())
         {
             super::clear();
@@ -542,7 +548,7 @@ namespace task_scheduler
     template < typename T, class TDataStructure, class TMemInterface >
     T &guarded< T, TDataStructure, TMemInterface >::at(size_t _index)
     {
-        assert(_index < super::size()); // Index out of bounds
+        ts_assert(_index < super::size()); // Index out of bounds
         return super::data() + _index;
     }
 
@@ -555,14 +561,14 @@ namespace task_scheduler
     template < typename T, class TDataStructure, class TMemInterface >
     T &guarded< T, TDataStructure, TMemInterface >::back()
     {
-        assert(super::size() > 0);
+        ts_assert(super::size() > 0);
         return at(super::size() - 1);
     }
 
     template < typename T, class TDataStructure, class TMemInterface >
     void guarded< T, TDataStructure, TMemInterface >::_Reallocate(typename TDataStructure::size_type _Count)
     {
-        assert(!is_locked()); //Data structure is being resized, the lock is no longer valid
+        ts_assert(!is_locked()); //Data structure is being resized, the lock is no longer valid
                               //Increase the initial size of the data structure
         super::_Reallocate(_Count);
     }
@@ -576,7 +582,7 @@ namespace task_scheduler
     template < typename T, class TMemInterface >
     using guarded_vector = guarded< T, std::vector< T, stl_allocator< T, TMemInterface > >, TMemInterface >;
 
-    template < typename T, class TMemInterface = default_mem_interface >
+    template < typename T, class TMemInterface >
     class guarded_write_array : public TMemInterface
     {
 

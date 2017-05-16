@@ -11,6 +11,8 @@
 
 #include <thread>
 
+#include "utils.h"
+#include "containers.h"
 
 /// <summary>
 /// The task_scheduler namespace.
@@ -71,10 +73,72 @@ namespace task_scheduler
             return (_classType->*_func)(std::forward< TArgs >(_params)...);
         }
 
-        class memory;
+        class errors
+        {
+        public:
+#if TASK_SCHEDULER_ENABLE_ITT != 0
+            enum type : unsigned int {
+                threads = __itt_suppress_threading_errors,
+                memory = __itt_suppress_memory_errors,
+                all = __itt_suppress_all_errors
+            };
+#else
+            enum type {
+                threads,
+                memory,
+                all
+            };
+#endif
+
+            inline static void suppress(enum type _error)
+            {
+                ts_itt(__itt_suppress_push((unsigned int)_error););
+                //stack.push_front(error);
+            }
+
+            inline static void unsuppress(enum type _error)
+            {
+                ts_itt(__itt_suppress_pop(););
+            }
+
+            //typedef lock_free_node_stack< void*, default_mem_interface > stack_type;
+            //static stack_type stack;
+        };
+
+        inline void suppress()
+        {
+            errors::suppress(errors::all);
+        }
+
+        inline void unsuppress()
+        {
+            errors::unsuppress(errors::all);
+        }
+
+        class memory : public errors
+        {
+        public:
+
+            static memory* create_instance(const tchar_t* _name, tchar_t* _domain);
+
+            static void suppress()
+            {
+                errors::suppress(errors::memory);
+            }
+
+            static void unsuppress()
+            {
+                errors::unsuppress(errors::memory);
+            }
+
+            virtual void allocate_begin(size_t _size, bool _initialized) {}
+
+            virtual void allocate_end(void** _memory_allocation, size_t _size, bool _initialized) {}
+
+        };
 
 #if TASK_SCHEDULER_ENABLE_ITT != 0
-        class memory_itt : private memory
+        class memory_itt : public memory
         {
         public:
             memory_itt(const tchar_t* _name, tchar_t* _domain)
@@ -89,7 +153,7 @@ namespace task_scheduler
 
             void allocate_end(void** _memory_allocation, size_t _size, bool _initialized) override
             {
-                __itt_heap_allocate_end(_heap, _memory_allocation, _size, _initialized ? 1 : 0);
+                __itt_heap_allocate_end(m_Heap, _memory_allocation, _size, _initialized ? 1 : 0);
             }
 
         private:
@@ -97,20 +161,29 @@ namespace task_scheduler
         };
 #endif
 
-        class memory
+        memory* memory::create_instance(const tchar_t* _name, tchar_t* _domain)
         {
-        public:
+            ts_itt(return new memory_itt(_name, _domain));
+        }
 
-            static memory* create_instance(const tchar_t* _name, tchar_t* _domain)
+        namespace thread
+        {
+            inline void set_name(const tchar_t* _name)
             {
-                ts_itt(return new memory_itt(_name, _domain));
+                ts_itt(__itt_thread_set_name(_name););
             }
 
-            virtual void allocate_begin(size_t _size, bool _initialized) {}
+            inline void suppress()
+            {
+                errors::suppress(errors::threads);
+            }
 
-            virtual void heap_allocate_end(void** _memory_allocation, size_t _size, bool _initialized) {}
+            inline void unsuppress()
+            {
+                errors::unsuppress(errors::threads);
+            }
 
-        };
+        }
 
     }
 }

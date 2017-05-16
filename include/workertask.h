@@ -76,7 +76,7 @@ namespace task_scheduler
         {
             if (super::transient.work_queue->pop_front(work_function))
             {
-                instrument< void, worker_task_type, void (worker_task_type::*)(typename super::function_type*) >(super::transient.task_time, this, &worker_task_type::run_internal, work_function);
+                profile::instrument< void, worker_task_type, void (worker_task_type::*)(typename super::function_type*) >(super::transient.task_time, this, &worker_task_type::run_internal, work_function);
                 ++super::transient.num_runned;
             }
         }

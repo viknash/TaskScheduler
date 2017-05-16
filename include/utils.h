@@ -42,11 +42,9 @@
 
 #if TASK_SCHEDULER_ENABLE_ITT == 0
 #define ts_itt(x)
-#define _t(x) x
 #else
 #include "ittnotify.h"
 #define ts_itt(x) x
-#define _t(x) _T(x)
 #endif
 
 #define ts_join_string(arg0, arg1) ts_do_join(arg0, arg1)

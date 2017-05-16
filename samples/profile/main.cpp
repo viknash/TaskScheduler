@@ -71,7 +71,7 @@ int main()
     thread_pool pool(128);
     task_graph_type task_graph(pool);
     task_graph_helper_type task_graph_helper(task_graph);
-    task_graph_helper.load("tasks.txt");
+    task_graph_helper.load(_t("tasks.txt"));
 
     guarded_vector< void *, default_mem_interface > vector(128);
     {

@@ -31,7 +31,7 @@ namespace task_scheduler
         typedef typename base_task<TMemInterface>::task_type task_type;
         typedef typename base_worker_task<TMemInterface>::worker_task_type worker_task_type;
 
-        typedef std::basic_string< char, std::char_traits< char >, stl_allocator< char, TMemInterface > > string_type;
+        typedef std::basic_string< tchar_t, std::char_traits< tchar_t >, stl_allocator< tchar_t, TMemInterface > > string_type;
         typedef std::vector< task_type *, stl_allocator< task_type *, TMemInterface > > task_vector;
         typedef base_thread_pool< TMemInterface > thread_pool;
         typedef task_type *task_list;
@@ -75,19 +75,19 @@ namespace task_scheduler
         using namespace std::placeholders;
 
         string_type line;
-        std::ifstream task_file(_file_name.c_str(), std::ios::in);
+        tifstream task_file(_file_name.c_str(), std::ios::in);
         assert(task_file.is_open()); // File was not found
         while (getline(task_file, line))
         {
-            typedef std::basic_istringstream< char, std::char_traits< char >, stl_allocator< char, TMemInterface > >
+            typedef std::basic_istringstream< tchar_t, std::char_traits< tchar_t >, stl_allocator< tchar_t, TMemInterface > >
                 istringstream_type;
             istringstream_type iss(line);
             string_type token;
             auto new_task = new worker_task_type(task_graph);
             unsigned int _task_file_field = 0;
-            while (getline(iss, token, ','))
+            while (getline(iss, token, _t(',')))
             {
-                std::cout << token << std::endl;
+                tcout << token << std::endl;
                 setup_task(new_task, _task_file_field, token);
                 _task_file_field++;
             }
@@ -107,7 +107,7 @@ namespace task_scheduler
                 }
                 else
                 {
-                    std::cout << "Cannot link" << task->debug.task_name << " to " << task_name << '\n';
+                    tcout << "Cannot link" << task->debug.task_name << " to " << task_name << '\n';
                 }
             }
         }

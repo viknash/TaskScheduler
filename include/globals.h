@@ -58,7 +58,7 @@ namespace task_scheduler
     /// <summary>
     /// The thread name
     /// </summary>
-    thread_local std::string thread_name;
+    thread_local tstring thread_name;
     /// <summary>
     /// The thread unique number
     /// </summary>

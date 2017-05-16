@@ -48,7 +48,7 @@ namespace task_scheduler
         typedef base_thread< TMemInterface > thread_type;
         typedef base_task_graph< TMemInterface > task_graph_type;
         typedef base_sub_graph< task_type, TMemInterface > sub_graph_type;
-        typedef std::basic_string< char, std::char_traits< char >, stl_allocator< char, TMemInterface > > string_type;
+        typedef std::basic_string< tchar_t, std::char_traits< tchar_t >, stl_allocator< tchar_t, TMemInterface > > string_type;
         typedef std::vector< string_type, stl_allocator< string_type, TMemInterface > > string_vector;
         typedef std::vector< task_type *, stl_allocator< task_type *, TMemInterface > > task_vector;
         typedef base_thread_pool< TMemInterface > thread_pool;
@@ -85,7 +85,7 @@ namespace task_scheduler
             /// </summary>
             /// <param name="_priority">The priority.</param>
             /// <returns>const char *.</returns>
-            const char *priority_to_string(priority_selector _priority) const;
+            const tchar_t* priority_to_string(priority_selector _priority) const;
 
             /// <summary>
             /// The task name
@@ -130,7 +130,7 @@ namespace task_scheduler
             /// <summary>
             /// Total time spent running all work functions in this task
             /// </summary>
-            profile_time task_time;
+            profile::time task_time;
             /// <summary>
             /// Total number of times work function was called
             /// </summary>
@@ -289,9 +289,9 @@ namespace task_scheduler
     };
 
     template < class TMemInterface >
-    const char *base_task< TMemInterface >::debug_container::priority_to_string(priority_selector priority) const
+    const tchar_t* base_task< TMemInterface >::debug_container::priority_to_string(priority_selector priority) const
     {
-        static const char *priority_to_string[] = {"REALTIME", "HIGH", "NORMAL", "LOW"};
+        static const tchar_t *priority_to_string[] = {_t("REALTIME"), _t("HIGH"), _t("NORMAL"), _t("LOW")};
 
         return priority_to_string[uint32_t(priority)];
     }

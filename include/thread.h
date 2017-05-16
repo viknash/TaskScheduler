@@ -172,9 +172,10 @@ namespace task_scheduler
     {
         thread_id = std::this_thread::get_id();
         current_thread = this;
-        std::ostringstream stringStream;
+        tostringstream stringStream;
         stringStream << uint32_t(thread_index);
         thread_name = stringStream.str();
+        profile::thread::set_name(thread_name.c_str());
 
         // Signal thread_type has started
         --pool.setup.thread_sync;
@@ -229,7 +230,7 @@ namespace task_scheduler
         while (pool.setup.request_exit != thread_pool::request_stop)
         {
             // Steal task_type
-            task_type *run_task = instrument< task_type *, thread_type, task_type *(thread_type::*)() >(
+            task_type *run_task = profile::instrument< task_type *, thread_type, task_type *(thread_type::*)() >(
                 scheduling, this, &thread_type::get_task);
 
             if (run_task)
@@ -239,7 +240,7 @@ namespace task_scheduler
                 ++pool.num_working;
                 ++run_task->transient.num_working;
                 while (
-                    instrument< bool, task_type, bool (task_type::*)() >(task_time, run_task, &task_type::operator()))
+                    profile::instrument< bool, task_type, bool (task_type::*)() >(task_time, run_task, &task_type::operator()))
                 {
                 };
                 --run_task->transient.num_working;
@@ -251,14 +252,14 @@ namespace task_scheduler
                 if (run_task->transient.num_working == 0)
                 {
                     // Donate More Tasks
-                    instrument< void, task_type, void (task_type::*)() >(scheduling, run_task,
+                    profile::instrument< void, task_type, void (task_type::*)() >(scheduling, run_task,
                                                                          &task_type::kick_dependent_tasks);
                 }
             }
             else if (!is_task_available())
             {
                 // Go to sleep if there is no task to run
-                instrument< void, thread_type, void (thread_type::*)(bool (thread_type::*)()) >(
+                profile::instrument< void, thread_type, void (thread_type::*)(bool (thread_type::*)()) >(
                     sleeping, this, &thread_type::sleep, &thread_type::is_task_available);
             }
         };

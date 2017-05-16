@@ -153,7 +153,7 @@ namespace task_scheduler
             {
                 for (uint32_t batch_index; batch_index < available_batch_size; ++batch_index)
                 {
-                    instrument< void, data_task_type, void (data_task_type::*)(typename super::function_type*) >(super::transient.task_time, this, &data_task_type::run_internal, work_function, *(batch + batch_index));
+                    profile::instrument< void, data_task_type, void (data_task_type::*)(typename super::function_type*) >(super::transient.task_time, this, &data_task_type::run_internal, work_function, *(batch + batch_index));
                 }
             }
             ++super::transient.num_runned;

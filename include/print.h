@@ -59,13 +59,13 @@ namespace task_scheduler
         {
             std::lock_guard< std::mutex > lk(globals.io_mutex);
             ts_windows_only(SetConsoleTextAttribute(globals.console_handle, get_thread_number()););
-            std::cout << buffer.str() << std::endl;
+            tcout << buffer.str() << std::endl;
         }
 
         /// <summary>
         /// The buffer
         /// </summary>
-        std::ostringstream buffer;
+        tostringstream buffer;
     };
 #else  // defined(TASK_SCHEDULER_DEBUG)
     /// <summary>
