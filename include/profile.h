@@ -84,66 +84,127 @@ namespace task_scheduler
         class errors
         {
         public:
-#if TASK_SCHEDULER_ENABLE_ITT != 0
-            enum type : unsigned int {
-                threads = __itt_suppress_threading_errors,
-                memory = __itt_suppress_memory_errors,
-                all = __itt_suppress_all_errors
-            };
-#else
             enum type {
-                threads,
+                threads = 0,
                 memory,
                 all
             };
+
+            virtual void suppress(enum type _error) = 0;
+            virtual void unsuppress(enum type _error) = 0;
+
+            template<class TInterface> friend TInterface* get();
+
+        private:
+
+            static errors* create_instance();
+        };
+
+#if TASK_SCHEDULER_PROFILER == TASK_SCHEDULER_PROFILER_ITT
+        class itt_errors
+        {
+        public:
+
+            uint32_t get_itt_error(enum errors::type _error)
+            {
+                switch (_error)
+                {
+                case errors::threads:
+                    return __itt_suppress_threading_errors;
+                case errors::memory:
+                    return __itt_suppress_memory_errors;
+                case errors::all:
+                    return __itt_suppress_all_errors;
+                }
+            }
+
+            inline void suppress(enum errors::type _error)
+            {
+                __itt_suppress_push((unsigned int)get_itt_error(_error));
+            }
+
+            inline void unsuppress(enum errors::type _error)
+            {
+                (void)_error;
+                __itt_suppress_pop();
+            }
+            
+        };
+#else
+        class basic_errors
+        {
+        public:
+            inline void suppress(enum type _error)
+            {
+                (void)_error;
+            }
+
+            inline void unsuppress(enum type _error)
+            {
+                (void)_error;
+            }
+        };
 #endif
 
-            inline static void suppress(enum type _error)
+        template <class TErrorImplementation>
+        class error_stack : public errors
+        {
+            typedef lock_free_node_dispenser< enum type, profile_mem_interface > memory_allocator_type;
+            typedef lock_free_stack< enum type, profile_mem_interface, memory_allocator_type > stack_type;
+
+        public:
+
+            void suppress(enum type _error) override
             {
-                ts_itt(__itt_suppress_push((unsigned int)_error););
+                error_implementation.suppress(_error);
                 stack.push_front(_error);
             }
 
-            inline static void unsuppress(enum type _error)
+            void unsuppress(enum type _error) override
             {
                 enum type stack_item;
                 stack.pop_front(stack_item);
                 ts_assert(stack_item == _error);
-                ts_itt(__itt_suppress_pop(););
+                error_implementation.unsuppress(_error);
             }
 
         private:
-            typedef lock_free_node_dispenser< enum type, profile_mem_interface > memory_allocator_type;
-            typedef lock_free_stack< enum type, profile_mem_interface, memory_allocator_type > stack_type;
-            static memory_allocator_type dispenser;
-            static stack_type stack;
+            memory_allocator_type dispenser;
+            stack_type stack;
+            TErrorImplementation error_implementation;
         };
 
-        inline void suppress()
+#if TASK_SCHEDULER_PROFILER == TASK_SCHEDULER_PROFILER_ITT
+        static errors* create_instance()
         {
-            errors::suppress(errors::all);
+            static error_stack<itt_errors> error_instance;
+            return &error_instance;
         }
-
-        inline void unsuppress()
+#else
+        static errors* create_instance()
         {
-            errors::unsuppress(errors::all);
+            static error_stack<basic_errors> error_instance;
+            return &error_instance;
         }
+#endif
 
-        class memory : public errors
+        class memory
         {
         public:
 
-            static memory* create_instance(const tchar_t* _name, tchar_t* _domain);
+            static memory* create_instance();
 
-            static void suppress()
+            void suppress()
             {
-                errors::suppress(errors::memory);
+                get<errors>()->suppress(errors::type::memory);
             }
 
-            static void unsuppress()
+            void unsuppress()
             {
-                errors::unsuppress(errors::memory);
+                get<errors>()->unsuppress(errors::memory);
             }
+
+            virtual void set_name(const tchar_t* _name, tchar_t* _domain) {}
 
             virtual void allocate_begin(size_t _size, bool _initialized) {}
 
@@ -151,34 +212,41 @@ namespace task_scheduler
 
         };
 
-#if TASK_SCHEDULER_ENABLE_ITT != 0
+#if TASK_SCHEDULER_PROFILER == TASK_SCHEDULER_PROFILER_ITT
         class memory_itt : public memory
         {
         public:
-            memory_itt(const tchar_t* _name, tchar_t* _domain)
+
+            void set_name(const tchar_t* _name, tchar_t* _domain) override
             {
-                m_Heap = __itt_heap_function_create(_name, _domain);
+                heap = __itt_heap_function_create(_name, _domain);
             }
 
             void allocate_begin(size_t _size, bool _initialized) override
             {
-                __itt_heap_allocate_begin(m_Heap, _size, _initialized ? 1 : 0);
+                __itt_heap_allocate_begin(heap, _size, _initialized ? 1 : 0);
             }
 
             void allocate_end(void** _memory_allocation, size_t _size, bool _initialized) override
             {
-                __itt_heap_allocate_end(m_Heap, _memory_allocation, _size, _initialized ? 1 : 0);
+                __itt_heap_allocate_end(heap, _memory_allocation, _size, _initialized ? 1 : 0);
             }
 
         private:
-            __itt_heap_function m_Heap;
+            __itt_heap_function heap;
         };
-#endif
 
-        memory* memory::create_instance(const tchar_t* _name, tchar_t* _domain)
+        memory* memory::create_instance()
         {
-            ts_itt(return new memory_itt(_name, _domain));
+            return new memory_itt();
         }
+#else
+        memory* memory::create_instance()
+        {
+            return nullptr;
+        }
+
+#endif
 
         namespace thread
         {
@@ -189,14 +257,24 @@ namespace task_scheduler
 
             inline void suppress()
             {
-                errors::suppress(errors::threads);
+                get<errors>()->suppress(errors::threads);
             }
 
             inline void unsuppress()
             {
-                errors::unsuppress(errors::threads);
+                get<errors>()->unsuppress(errors::threads);
             }
 
+        }
+
+        inline void suppress()
+        {
+            get<errors>()->suppress(errors::all);
+        }
+
+        inline void unsuppress()
+        {
+            get<errors>()->unsuppress(errors::all);
         }
 
     }

@@ -40,11 +40,11 @@
 #define ts_assert(x) assert(x)
 #endif
 
-#if TASK_SCHEDULER_ENABLE_ITT == 0
-#define ts_itt(x)
-#else
+#if TASK_SCHEDULER_PROFILER == TASK_SCHEDULER_PROFILER_ITT
 #include "ittnotify.h"
 #define ts_itt(x) x
+#else
+#define ts_itt(x)
 #endif
 
 #define ts_join_string(arg0, arg1) ts_do_join(arg0, arg1)
@@ -175,4 +175,15 @@ namespace task_scheduler
     typedef scoped_enter_exit< unsafe_multi_threaded_access_detector< thread_unsafe_access_storage >,
                                thread_unsafe_access_storage >
         thread_unsafe_access_guard;
+
+    template<class TInterface>
+    TInterface* get()
+    {
+        static TInterface* system;
+        if (!system)
+        {
+            system = TInterface::create_instance();
+        }
+        return system;
+    }
 };

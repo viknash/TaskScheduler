@@ -115,7 +115,8 @@ namespace task_scheduler
     inline void default_mem_interface::init()
     {
         ts_assert(profile_memory == nullptr);
-        profile_memory = profile::memory::create_instance(_t("CRT"), _t("Memory"));
+        profile_memory = get<profile::memory>();
+        profile_memory->set_name(_t("CRT"), _t("Memory"));
     }
 
 #define task_scheduler_default_mem_interface_catch_all_allocations()                                                   \
