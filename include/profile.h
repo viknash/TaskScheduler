@@ -137,6 +137,20 @@ namespace task_scheduler
 
             static void deallocate(memory* _instance);
 
+            memory()
+                : data(nullptr)
+            {}
+
+            void set_user_data(void* _data)
+            {
+                data = _data;
+            }
+
+            void* get_user_data()
+            {
+                return data;
+            }
+
             void suppress()
             {
                 get<errors>()->suppress(errors::type::memory);
@@ -147,12 +161,20 @@ namespace task_scheduler
                 get<errors>()->unsuppress(errors::memory);
             }
 
-            virtual void set_name(const tchar_t* _name, tchar_t* _domain) {}
+            virtual void set_name(const tchar_t* _name, tchar_t* _domain) {
+                ts_unused(_name); ts_unused(_domain);
+            }
 
-            virtual void allocate_begin(size_t _size, bool _initialized) {}
+            virtual void allocate_begin(size_t _size, bool _initialized) {
+                ts_unused(_size); ts_unused(_initialized);
+            }
 
-            virtual void allocate_end(void** _memory_allocation, size_t _size, bool _initialized) {}
+            virtual void allocate_end(void** _memory_allocation, size_t _size, bool _initialized) {
+                ts_unused(_memory_allocation); ts_unused(_size); ts_unused(_initialized);
+            }
 
+        private:
+            void* data;
         };
 
         namespace thread

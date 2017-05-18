@@ -52,6 +52,8 @@
 
 #define ts_unique_variable(basename) ts_join_string(basename, __COUNTER__)
 
+#define ts_unused(x) (x)=(x);
+
 /// <summary>
 /// The task_scheduler namespace.
 /// </summary>
