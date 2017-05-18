@@ -97,54 +97,8 @@ namespace task_scheduler
 
         private:
 
-            static errors* create_instance();
+            static errors* instance();
         };
-
-#if TASK_SCHEDULER_PROFILER == TASK_SCHEDULER_PROFILER_ITT
-        class itt_errors
-        {
-        public:
-
-            uint32_t get_itt_error(enum errors::type _error)
-            {
-                switch (_error)
-                {
-                case errors::threads:
-                    return __itt_suppress_threading_errors;
-                case errors::memory:
-                    return __itt_suppress_memory_errors;
-                case errors::all:
-                    return __itt_suppress_all_errors;
-                }
-            }
-
-            inline void suppress(enum errors::type _error)
-            {
-                __itt_suppress_push((unsigned int)get_itt_error(_error));
-            }
-
-            inline void unsuppress(enum errors::type _error)
-            {
-                (void)_error;
-                __itt_suppress_pop();
-            }
-            
-        };
-#else
-        class basic_errors
-        {
-        public:
-            inline void suppress(enum type _error)
-            {
-                (void)_error;
-            }
-
-            inline void unsuppress(enum type _error)
-            {
-                (void)_error;
-            }
-        };
-#endif
 
         template <class TErrorImplementation>
         class error_stack : public errors
@@ -169,30 +123,19 @@ namespace task_scheduler
             }
 
         private:
-            memory_allocator_type dispenser;
             stack_type stack;
+            memory_allocator_type dispenser;
             TErrorImplementation error_implementation;
         };
 
-#if TASK_SCHEDULER_PROFILER == TASK_SCHEDULER_PROFILER_ITT
-        static errors* create_instance()
-        {
-            static error_stack<itt_errors> error_instance;
-            return &error_instance;
-        }
-#else
-        static errors* create_instance()
-        {
-            static error_stack<basic_errors> error_instance;
-            return &error_instance;
-        }
-#endif
 
         class memory
         {
         public:
 
-            static memory* create_instance();
+            static memory* allocate();
+
+            static void deallocate(memory* _instance);
 
             void suppress()
             {
@@ -211,42 +154,6 @@ namespace task_scheduler
             virtual void allocate_end(void** _memory_allocation, size_t _size, bool _initialized) {}
 
         };
-
-#if TASK_SCHEDULER_PROFILER == TASK_SCHEDULER_PROFILER_ITT
-        class memory_itt : public memory
-        {
-        public:
-
-            void set_name(const tchar_t* _name, tchar_t* _domain) override
-            {
-                heap = __itt_heap_function_create(_name, _domain);
-            }
-
-            void allocate_begin(size_t _size, bool _initialized) override
-            {
-                __itt_heap_allocate_begin(heap, _size, _initialized ? 1 : 0);
-            }
-
-            void allocate_end(void** _memory_allocation, size_t _size, bool _initialized) override
-            {
-                __itt_heap_allocate_end(heap, _memory_allocation, _size, _initialized ? 1 : 0);
-            }
-
-        private:
-            __itt_heap_function heap;
-        };
-
-        memory* memory::create_instance()
-        {
-            return new memory_itt();
-        }
-#else
-        memory* memory::create_instance()
-        {
-            return nullptr;
-        }
-
-#endif
 
         namespace thread
         {
@@ -277,5 +184,38 @@ namespace task_scheduler
             get<errors>()->unsuppress(errors::all);
         }
 
+#if TASK_SCHEDULER_PROFILER == TASK_SCHEDULER_PROFILER_NONE
+        class basic_errors
+        {
+        public:
+            inline void suppress(enum type _error)
+            {
+                (void)_error;
+            }
+
+            inline void unsuppress(enum type _error)
+            {
+                (void)_error;
+            }
+        };
+
+        static errors* instance()
+        {
+            static error_stack<basic_errors> error_instance;
+            return &error_instance;
+        }
+
+        memory* memory::allocate()
+        {
+            return nullptr;
+        }
+#endif
+
+        void deallocate(memory* _instance)
+        {
+            delete _instance;
+        }
+
     }
+
 }

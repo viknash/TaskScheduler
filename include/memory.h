@@ -40,13 +40,12 @@ namespace task_scheduler
         };
 
       public:
-          /// <summary>
-          /// Implements the operator new operator.
-          /// </summary>
-          /// <param name="_size">The size.</param>
-          /// <returns>The result of the operator.</returns>
-          inline void *operator new(size_t _size) { return operator new(_size, ALIGNMENT); };
-
+        /// <summary>
+        /// Implements the operator new operator.
+        /// </summary>
+        /// <param name="_size">The size.</param>
+        /// <returns>The result of the operator.</returns>
+        inline void *operator new(size_t _size) { return operator new(_size, ALIGNMENT); };
         /// <summary>
         /// Implements the operator new operator.
         /// </summary>
@@ -67,12 +66,12 @@ namespace task_scheduler
         /// <param name="_alignment">The alignment.</param>
         /// <returns>The result of the operator.</returns>
         inline void *operator new[](size_t _size, size_t _alignment) { return operator new(_size, _alignment); }
-            /// <summary>
-            /// Implements the operator delete operator.
-            /// </summary>
-            /// <param name="_ptr">The PTR.</param>
-            /// <param name="_size">The size.</param>
-            /// <returns>The result of the operator.</returns>
+        /// <summary>
+        /// Implements the operator delete operator.
+        /// </summary>
+        /// <param name="_ptr">The PTR.</param>
+        /// <param name="_size">The size.</param>
+        /// <returns>The result of the operator.</returns>
         inline void operator delete(void *_ptr, size_t _size);
         /// <summary>
         /// Implements the operator delete[] operator.
@@ -82,13 +81,13 @@ namespace task_scheduler
         /// <returns>The result of the operator.</returns>
         inline void operator delete[](void *_ptr, size_t _size) { operator delete(_ptr, _size); }
 
-        static inline void init();
+        default_mem_interface();
 
     private:
-        static profile::memory* profile_memory;
+        profile::memory* profile_memory;
     };
 
-    inline void *default_mem_interface::operator new(size_t _size, size_t _alignment)
+    inline void* default_mem_interface::operator new(size_t _size, size_t _alignment)
     {
         metadata_type metadata = {0};
         metadata.space = _size + sizeof(metadata_type) + _alignment;
@@ -112,11 +111,11 @@ namespace task_scheduler
         free(raw_pointer);
     }
 
-    inline void default_mem_interface::init()
+    default_mem_interface::default_mem_interface()
     {
-        ts_assert(profile_memory == nullptr);
-        profile_memory = get<profile::memory>();
-        profile_memory->set_name(_t("CRT"), _t("Memory"));
+        static profile::memory memory_profiler;
+        memory_profiler.set_name(_t("CRT"), _t("Memory"));
+        profile_memory = &memory_profiler;
     }
 
 #define task_scheduler_default_mem_interface_catch_all_allocations()                                                   \
@@ -125,8 +124,5 @@ namespace task_scheduler
     void operator delete(void *p, size_t n) throw() { gDefaultMemInterface.operator delete(p, n); }                    \
     void *operator new[](size_t n) { return gDefaultMemInterface.operator new[](n); }                                  \
     void operator delete[](void *p, size_t n) throw() { gDefaultMemInterface.operator delete[](p, n); }
-
-#define task_scheduler_default_mem_interface_static_init()                                                             \
-    task_scheduler::profile::memory* default_mem_interface::profile_memory = nullptr;
 
 };

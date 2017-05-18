@@ -30,7 +30,6 @@ using namespace task_scheduler;
 using namespace std;
 
 task_scheduler_default_mem_interface_catch_all_allocations();
-task_scheduler_default_mem_interface_static_init();
 task_scheduler_static_data();
 
 /// <summary>
@@ -67,7 +66,6 @@ int main()
     typedef base_task_graph_helper< default_mem_interface > task_graph_helper_type;
     typedef base_thread_pool< default_mem_interface > thread_pool;
 
-    default_mem_interface::init();
     thread_pool pool(128);
     task_graph_type task_graph(pool);
     task_graph_helper_type task_graph_helper(task_graph);

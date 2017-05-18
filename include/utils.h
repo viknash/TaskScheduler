@@ -182,8 +182,20 @@ namespace task_scheduler
         static TInterface* system;
         if (!system)
         {
-            system = TInterface::create_instance();
+            system = TInterface::instance();
         }
         return system;
+    }
+
+    template<class TInterface>
+    TInterface* create()
+    {
+        return TInterface::allocate();
+    }
+
+    template<class TInterface>
+    void destroy(TInterface* _interface)
+    {
+        TInterface::deallocate(_interface);
     }
 };
