@@ -12,7 +12,7 @@
 #include "lockfreenode.h"
 
 namespace task_scheduler {
-    template < typename T, class TMemInterface > class lock_free_node_stack : public TMemInterface
+    template < typename T, class TMemInterface > class class_alignment lock_free_node_stack : public TMemInterface
     {
         typedef lock_free_node< T, TMemInterface > node_type;
         typedef atomic_lock_free_node_ptr< T, TMemInterface > atomic_node_ptr;
@@ -60,6 +60,9 @@ namespace task_scheduler {
         }
 
         bool empty() { return head.data.points_to.node == nullptr; }
+
+        ~lock_free_node_stack()
+        {}
 
     private:
         atomic_node_ptr head;

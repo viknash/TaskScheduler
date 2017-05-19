@@ -473,8 +473,7 @@ namespace task_scheduler
                 initializedSubGraph = true;
             }
             uint64_t start_gate = kick_task->transient.start_gate.load();
-            assert(start_gate == 0);
-            (void)start_gate;
+            ts_assert(start_gate == 0);
             task_graph.queue_task(kick_task);
         }
     }
@@ -497,7 +496,7 @@ namespace task_scheduler
     template < class TMemInterface >
     void base_task< TMemInterface >::before_scheduled(thread_num_t _scheduled_on_num_workers)
     {
-        (void)_scheduled_on_num_workers;
+        ts_unused(_scheduled_on_num_workers);
     }
 
     template < class TMemInterface >

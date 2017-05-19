@@ -46,8 +46,7 @@ namespace task_scheduler {
     void guarded< T, TDataStructure, TMemInterface >::lock(T *&_locked_data)
     {
         bool previous_value = read_locked.exchange(true);
-        ts_assert(!previous_value);
-        (void)previous_value; // Array has already been locked before
+        ts_assert(!previous_value); // Array has already been locked before
         _locked_data = super::data();
     }
 
@@ -58,8 +57,7 @@ namespace task_scheduler {
         ts_assert(super::data() == _unlocked_data);
         _unlocked_data = nullptr;
         bool previous_value = read_locked.exchange(false);
-        ts_assert(previous_value);
-        (void)previous_value; // Array not been locked before
+        ts_assert(previous_value); // Array not been locked before
     }
 
     template < typename T, class TDataStructure, class TMemInterface >

@@ -47,13 +47,13 @@ namespace task_scheduler
 
             inline void unsuppress(enum errors::type _error)
             {
-                (void)_error;
+                ts_unused(_error);
                 __itt_suppress_pop();
             }
             
         };
 
-
+        template <class TKey>
         static errors* instance()
         {
             static error_stack<itt_errors> error_instance;
@@ -83,9 +83,11 @@ namespace task_scheduler
             __itt_heap_function heap;
         };
 
-        memory* memory::allocate()
+        template< typename TKey>
+        memory* memory::instance()
         {
-            return new memory_itt();
+            static memory_itt memory;
+            return &memory;
         }
 
 #endif

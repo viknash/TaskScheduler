@@ -35,9 +35,11 @@
 #endif
 
 #if TASK_SCHEDULER_ASSERT == 0
-#define ts_assert(x)
+#define ts_assert(x) ts_unused(x)
+#define ts_always_assert()
 #else
 #define ts_assert(x) assert(x)
+#define ts_always_assert() ts_assert(0)
 #endif
 
 #if TASK_SCHEDULER_PROFILER == TASK_SCHEDULER_PROFILER_ITT
@@ -178,21 +180,21 @@ namespace task_scheduler
                                thread_unsafe_access_storage >
         thread_unsafe_access_guard;
 
-    template<class TInterface>
+    template<class TInterface, class TKey = TInterface>
     TInterface* get()
     {
-        static TInterface* system;
+        static TInterface* system = nullptr;
         if (!system)
         {
-            system = TInterface::instance();
+            system = TInterface::instance<TKey>();
         }
         return system;
     }
 
-    template<class TInterface>
+    template<class TInterface, class TKey>
     TInterface* create()
     {
-        return TInterface::allocate();
+        return TInterface::allocate<TKey>();
     }
 
     template<class TInterface>

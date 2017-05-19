@@ -64,6 +64,9 @@ namespace task_scheduler {
                 address access;
             };
             atomics::type as_atomic[2];
+
+            Data() {}
+            ~Data() {}
         };
 #pragma warning(pop)
         inline void clear()
@@ -85,8 +88,11 @@ namespace task_scheduler {
             data.points_to.node = other.data.points_to.node;
         }
 
+        atomic_lock_free_node_ptr() {};
+        ~atomic_lock_free_node_ptr() {};
+
         Data data;
     };
-    //static_assert(sizeof(atomic_lock_free_node_ptr< bool, dummy >) == sizeof(address) * 2,
-    //              "size of atomic_lock_free_node_ptr is incorrect.");
+    static_assert(sizeof(atomic_lock_free_node_ptr< bool, dummy >) == sizeof(address) * 2,
+                  "size of atomic_lock_free_node_ptr is incorrect.");
 }

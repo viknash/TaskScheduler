@@ -371,8 +371,7 @@ namespace task_scheduler
         // initialize head tasks
         auto found = find_head(persistent.head_tasks);
         // Check if we have at least one head
-        assert(found);
-        (void)found;
+        ts_assert(found);
 
         // Setup end nodes to start head nodes
         setup_tail_kickers();

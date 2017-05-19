@@ -23,6 +23,7 @@
 namespace task_scheduler
 {
 
+
      /// <summary>
     /// Class default_mem_interface.
     /// </summary>
@@ -53,7 +54,7 @@ namespace task_scheduler
         /// <param name="_size">The size.</param>
         /// <param name="_alignment">The alignment.</param>
         /// <returns>The result of the operator.</returns>
-        inline void *operator new(size_t _size, size_t _alignment);
+        void *operator new(size_t _size, size_t _alignment);
         /// <summary>
         /// Implements the operator new[] operator.
         /// </summary>
@@ -73,7 +74,7 @@ namespace task_scheduler
         /// <param name="_ptr">The PTR.</param>
         /// <param name="_size">The size.</param>
         /// <returns>The result of the operator.</returns>
-        inline void operator delete(void *_ptr, size_t _size);
+        void operator delete(void *_ptr, size_t _size);
         /// <summary>
         /// Implements the operator delete[] operator.
         /// </summary>
@@ -82,20 +83,16 @@ namespace task_scheduler
         /// <returns>The result of the operator.</returns>
         inline void operator delete[](void *_ptr, size_t _size) { operator delete(_ptr, _size); }
 
-        default_mem_interface();
-        ~default_mem_interface();
-
-    private:
-        profile::memory* profile_memory;
     };
 
-    inline void* default_mem_interface::operator new(size_t _size, size_t _alignment)
+     void *default_mem_interface::operator new(size_t _size, size_t _alignment)
     {
-        metadata_type metadata = {0};
+        metadata_type metadata = { 0 };
         metadata.space = _size + sizeof(metadata_type) + _alignment;
-        profile_memory->allocate_begin(metadata.space, false);
+        profile::memory* profile = get<profile::memory, default_mem_interface>();
+        profile->allocate_begin(metadata.space, false);
         void *raw_pointer = malloc(metadata.space);
-        profile_memory->allocate_end(&raw_pointer, metadata.space, false);
+        profile->allocate_end(&raw_pointer, metadata.space, false);
         ts_assert(raw_pointer);
         void *aligned_pointer = std::align(_alignment, _size + sizeof(metadata_type), raw_pointer, metadata.space);
         ts_assert(aligned_pointer);
@@ -103,7 +100,7 @@ namespace task_scheduler
         return aligned_pointer;
     }
 
-    inline void default_mem_interface::operator delete(void *_ptr, size_t _size)
+    void default_mem_interface::operator delete(void *_ptr, size_t _size)
     {
         size_t alignment = ALIGNMENT;
         void *aligned_pointer = _ptr;
@@ -113,31 +110,7 @@ namespace task_scheduler
         free(raw_pointer);
     }
 
-    default_mem_interface::default_mem_interface()
-    {
-        static profile::memory* memory_profiler = nullptr;
-        static atomic_uint32_t construction_count = 0;
-        if (memory_profiler == nullptr)
-        {
-            memory_profiler = create<profile::memory>();
-            memory_profiler->set_name(_t("CRT"), _t("Memory"));
-            memory_profiler->set_user_data((void*)&construction_count);
-        }
-        ++construction_count;
-        profile_memory = memory_profiler;
-    }
 
-    default_mem_interface::~default_mem_interface()
-    {
-        if (profile_memory)
-        {
-            atomic_uint32_t construction_count& = *(atomic_uint32_t*)profile_memory->get_user_data();
-            if (--construction_count == 0)
-            {
-                destroy<profile::memory>(profile_memory);
-            }
-        }
-    }
 
 
 #define task_scheduler_default_mem_interface_catch_all_allocations()                                                   \
