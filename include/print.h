@@ -16,13 +16,9 @@
 #include <sstream>
 #include <thread>
 
-#include "globals.h"
 #include "platform.h"
-#include "utils.h"
+#include "globals.h"
 
-#if !defined(TASK_SCHEDULER_DEBUG)
-#error("TASK_SCHEDULER_DEBUG is not defined")
-#endif // !defined(TASK_SCHEDULER_DEBUG)
 
 /// <summary>
 /// The task_scheduler namespace.
@@ -57,8 +53,8 @@ namespace task_scheduler
         /// </summary>
         ~out_t()
         {
-            std::lock_guard< std::mutex > lk(globals.io_mutex);
-            ts_windows_only(SetConsoleTextAttribute(globals.console_handle, get_thread_number()););
+            std::lock_guard< std::mutex > lk(get<globals>()->io_mutex);
+            ts_windows_only(SetConsoleTextAttribute(get<globals>()->console_handle, get_thread_number()););
             tcout << buffer.str() << std::endl;
         }
 
@@ -81,12 +77,6 @@ namespace task_scheduler
         template < typename T > out_t &operator<<(T &&x) { return *this; };
     };
 #endif // defined(TASK_SCHEDULER_DEBUG)
-
-#define task_scheduler_static_data()                                                                                   \
-    namespace task_scheduler                                                                                           \
-    {                                                                                                                  \
-        static_data_t globals;                                                                                         \
-    };
 
 #define ts_print_internal(arg)                                                                                         \
     out_t arg;                                                                                                         \

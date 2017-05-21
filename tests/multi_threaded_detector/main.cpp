@@ -25,8 +25,6 @@
 using namespace task_scheduler;
 using namespace std;
 
-task_scheduler_static_data();
-
 namespace
 {
     class MultiThreadedDetectorTest : public ::testing::Test

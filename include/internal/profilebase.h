@@ -124,7 +124,6 @@ namespace task_scheduler
             TErrorImplementation error_implementation;
         };
 
-
         class memory
         {
         public:
@@ -157,10 +156,6 @@ namespace task_scheduler
 
         namespace thread
         {
-            inline void set_name(const tchar_t* _name)
-            {
-                ts_itt(__itt_thread_set_name(_name););
-            }
 
             inline void suppress()
             {
@@ -183,6 +178,52 @@ namespace task_scheduler
         {
             get<errors>()->unsuppress(errors::all);
         }
+
+        template <class TStringImplementation>
+        class basic_string : public TStringImplementation
+        {
+        public:
+
+            basic_string(const tchar_t* _name)
+                : TStringImplementation(_name)
+            {
+            }
+
+            typename TStringImplementation::handle& operator* ()
+            {
+                return TStringImplementation::operator*();
+            }
+
+        };
+
+
+        template < class T > class base_task
+        {
+
+        public:
+
+            base_task()
+
+            {
+            }
+
+            bool enter(T &_param)
+            {
+                return true;
+            }
+
+            /// <summary>
+            /// Exits the specified storage.
+            /// </summary>
+            /// <param name="storage">The storage.</param>
+            /// <returns>bool.</returns>
+            bool exit(T &storage)
+            {
+                return true;
+            }
+        };
+
+        typedef scoped_enter_exit<  > task_scoped_instrument;
 
     }
 

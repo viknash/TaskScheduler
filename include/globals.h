@@ -15,6 +15,7 @@
 
 #include "platform.h"
 #include "types.h"
+#include "utils.h"
 
 /// <summary>
 /// The task_scheduler namespace.
@@ -28,10 +29,11 @@ namespace task_scheduler
     const thread_num_t max_num_threads = 64;
 
     /// <summary>
-    /// Struct static_data_t
+    /// class globals 
     /// </summary>
-    struct static_data_t
+    class globals
     {
+        public:
         /// <summary>
         /// The io mutex
         /// </summary>
@@ -46,14 +48,19 @@ namespace task_scheduler
         /// Statics the data t.
         /// </summary>
         /// <returns>int.</returns>
-        static_data_t()
+        globals()
             : next_thread_number(1)
         {
             ts_windows_only(console_handle = GetStdHandle(STD_OUTPUT_HANDLE););
         }
-    };
 
-    extern static_data_t globals;
+        template <class TKey>
+        static globals* instance()
+        {
+            static globals static_data;
+            return &static_data;
+        }
+    };
 
     /// <summary>
     /// The thread name
@@ -76,7 +83,7 @@ namespace task_scheduler
     {
         if (!thread_unique_number)
         {
-            thread_unique_number = ++globals.next_thread_number;
+            thread_unique_number = ++(get<globals>()->next_thread_number);
         }
         return thread_unique_number;
     }
@@ -87,9 +94,4 @@ namespace task_scheduler
     /// <returns>T *.</returns>
     template < class T > T *get_current_thread() { return static_cast<T *>(current_thread); }
 
-#define task_scheduler_static_data()                                                                                   \
-    namespace task_scheduler                                                                                           \
-    {                                                                                                                  \
-        static_data_t globals;                                                                                         \
-    };
 }

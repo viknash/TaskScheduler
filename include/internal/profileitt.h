@@ -90,6 +90,34 @@ namespace task_scheduler
             return &memory;
         }
 
+        namespace thread
+        {
+            inline void set_name(const tchar_t* _name)
+            {
+                __itt_thread_set_name(_name);
+            }
+        }
+
+        class itt_string
+        {
+            typedef __itt_string_handle* handle;
+        protected:
+
+            itt_string(const tchar_t* _name)
+            {
+                itt_string_handle = __itt_string_handle_create(_name);
+            };
+
+            typename handle& operator* ()
+            {
+                return itt_string_handle;
+            }
+        private:
+            __itt_string_handle* itt_string_handle;
+        };
+
+        typedef basic_string<itt_string> string;
+
 #endif
 
     }

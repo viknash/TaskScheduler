@@ -49,6 +49,33 @@ namespace task_scheduler
             ts_always_assert();
             return nullptr;
         }
+
+        namespace thread
+        {
+            inline void set_name(const tchar_t* _name)
+            {
+                ts_unused(_name);
+            }
+        }
+
+        class null_string
+        {
+            typedef void* handle;
+        protected:
+
+            null_string(const tchar_t* _name)
+            {
+                ts_unused(_name);
+            };
+
+            typename handle& operator* ()
+            {
+                static handle dummy = nullptr;
+                return dummy;
+            }
+        };
+
+        typedef basic_string<null_string> string;
 #endif
 
     }

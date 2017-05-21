@@ -111,8 +111,6 @@ namespace task_scheduler
     }
 
 
-
-
 #define task_scheduler_default_mem_interface_catch_all_allocations()                                                   \
     default_mem_interface gDefaultMemInterface;                                                                        \
     void *operator new(size_t n) { return gDefaultMemInterface.operator new(n); }                                      \

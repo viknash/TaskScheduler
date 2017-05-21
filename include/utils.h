@@ -19,7 +19,6 @@
 
 #include "types.h"
 
-
 #if !defined(TASK_SCHEDULER_DEBUG)
 #error("TASK_SCHEDULER_DEBUG is not defined")
 #endif

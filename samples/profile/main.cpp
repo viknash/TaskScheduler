@@ -30,7 +30,6 @@ using namespace task_scheduler;
 using namespace std;
 
 task_scheduler_default_mem_interface_catch_all_allocations();
-task_scheduler_static_data();
 
 /// <summary>
 /// Randoms the time task.
