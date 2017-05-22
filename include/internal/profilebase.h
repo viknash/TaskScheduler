@@ -196,18 +196,25 @@ namespace task_scheduler
 
         };
 
+        class domain
+        {
+        public:
+            virtual const tchar_t* name(const tchar_t* _name = nullptr) {}
+        
+            template <class TKey>
+            static domain* instance();
+        };
 
-        template < class T > class base_task
+        class base_task
         {
 
         public:
 
             base_task()
-
             {
             }
 
-            bool enter(T &_param)
+            bool enter()
             {
                 return true;
             }
@@ -217,13 +224,13 @@ namespace task_scheduler
             /// </summary>
             /// <param name="storage">The storage.</param>
             /// <returns>bool.</returns>
-            bool exit(T &storage)
+            bool exit()
             {
-                return true;
+                return false;
             }
         };
 
-        typedef scoped_enter_exit<  > task_scoped_instrument;
+        typedef scoped_enter_exit< base_task > task_scoped_instrument;
 
     }
 

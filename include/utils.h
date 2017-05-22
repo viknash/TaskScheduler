@@ -81,7 +81,7 @@ namespace task_scheduler
     /// <summary>
     /// Class unsafe_multi_threaded_access_detector.
     /// </summary>
-    template < class T > class unsafe_multi_threaded_access_detector
+    template < class TClassType > class unsafe_multi_threaded_access_detector
     {
 
       public:
@@ -98,7 +98,7 @@ namespace task_scheduler
         /// </summary>
         /// <param name="storage">The storage.</param>
         /// <returns>bool.</returns>
-        bool enter(T &storage)
+        bool enter(TClassType &storage)
         {
             int64_t new_thread_id = std::hash< std::thread::id >()(std::this_thread::get_id());
             previous_thread_id = storage.last_thread_id.exchange(new_thread_id);
@@ -112,7 +112,7 @@ namespace task_scheduler
         /// </summary>
         /// <param name="storage">The storage.</param>
         /// <returns>bool.</returns>
-        bool exit(T &storage)
+        bool exit(TClassType &storage)
         {
             int64_t stored_thread_id = storage.last_thread_id.exchange(previous_thread_id);
             int64_t current_thread_id = std::hash< std::thread::id >()(std::this_thread::get_id());
@@ -128,11 +128,16 @@ namespace task_scheduler
           std::atomic_int64_t previous_thread_id;
     };
 
+    class base_scoped_param
+    {
+
+    };
+
     /// <summary>
     /// Class scoped_enter_exit.
     /// </summary>
     /// <seealso cref="T" />
-    template < typename T, typename TParam > class scoped_enter_exit : public T
+    template < typename TClassType, typename TParam = base_scoped_param > class scoped_enter_exit
     {
       public:
           /// <summary>
@@ -142,19 +147,40 @@ namespace task_scheduler
           scoped_enter_exit(TParam &_param)
             : param(_param)
         {
-            this->enter(param);
+              class_type.enter(param);
         }
 
         /// <summary>
         /// Finalizes an instance of the <see cref="scoped_enter_exit"/> class.
         /// </summary>
-        ~scoped_enter_exit() { this->exit(param); }
+        ~scoped_enter_exit() { class_type.exit(param); }
 
       private:
           /// <summary>
           /// The parameter
           /// </summary>
           TParam &param;
+          TClassType class_type;
+    };
+
+    template < typename TClassType > class scoped_enter_exit<TClassType, base_scoped_param>
+    {
+    public:
+        /// <summary>
+        /// Initializes a new instance of the <see cref="scoped_enter_exit"/> class.
+        /// </summary>
+        scoped_enter_exit()
+        {
+            class_type.enter();
+        }
+
+        /// <summary>
+        /// Finalizes an instance of the <see cref="scoped_enter_exit"/> class.
+        /// </summary>
+        ~scoped_enter_exit() { class_type.exit(); }
+
+    private:
+        TClassType class_type;
     };
 
     /// <summary>
@@ -201,4 +227,5 @@ namespace task_scheduler
     {
         TInterface::deallocate(_interface);
     }
+
 };
