@@ -228,4 +228,27 @@ namespace task_scheduler
         TInterface::deallocate(_interface);
     }
 
+    template<typename T>
+    class attribute
+    {
+    protected:
+        T val;
+    public:
+        operator T() { return val; }
+        T &operator=(const T &_other_val) { val = _other_val; return val; }
+    private:
+        T *operator&() { return &val; }
+    };
+
+    template<typename T, typename TGetFunc, typename TSetFunc>
+    class attribute2
+    {
+    protected:
+        T val;
+    public:
+        operator T() { return TGetFunc(*this); }
+        T &operator=(const T &_other_val) { TSetFunc(*this); return val; }
+    private:
+        T *operator&() { return &val; }
+    };
 };

@@ -65,6 +65,8 @@ int main()
     typedef base_task_graph_helper< default_mem_interface > task_graph_helper_type;
     typedef base_thread_pool< default_mem_interface > thread_pool;
 
+    get<profile::domain>()->name = _t("profile");
+
     thread_pool pool(128);
     task_graph_type task_graph(pool);
     task_graph_helper_type task_graph_helper(task_graph);

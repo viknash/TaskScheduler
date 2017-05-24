@@ -175,7 +175,7 @@ namespace task_scheduler
         tostringstream stringStream;
         stringStream << uint32_t(thread_index);
         thread_name = stringStream.str();
-        profile::thread::set_name(thread_name.c_str());
+        //profile::thread::set_name(thread_name.c_str());
 
         // Signal thread_type has started
         --pool.setup.thread_sync;

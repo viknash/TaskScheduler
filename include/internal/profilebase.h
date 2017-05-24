@@ -196,11 +196,17 @@ namespace task_scheduler
 
         };
 
+
+
         class domain
         {
         public:
-            virtual const tchar_t* name(const tchar_t* _name = nullptr) {}
+            typedef attribute2<const tchar_t*, domain::set_name, domain::get_name> Name;
+            //virtual const tchar_t* name(const tchar_t* _name = nullptr) {}
         
+            virtual void set_name(const tchar_t* _name) {}
+
+            Name name;
             template <class TKey>
             static domain* instance();
         };

@@ -93,11 +93,16 @@ namespace task_scheduler
         class domain_itt : public domain
         {
         public:
-            virtual const tchar_t* name(const tchar_t* _name = nullptr) {}
+            //virtual const tchar_t* name(const tchar_t* _name = nullptr) {}
 
-            template <class TKey>
-            static domain* instance();
         };
+
+        template <class TKey>
+        static domain* domain::instance()
+        {
+            static domain_itt domain;
+            return &domain;
+        }
 
 #endif
 
