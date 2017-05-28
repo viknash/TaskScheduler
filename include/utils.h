@@ -228,27 +228,113 @@ namespace task_scheduler
         TInterface::deallocate(_interface);
     }
 
-    template<typename T>
+    template<class TOwnerClass, typename TType>
     class attribute
     {
-    protected:
-        T val;
+        typedef void (TOwnerClass::*TSetFunc)(typename TType);
+        typedef typename TType (TOwnerClass::*TGetFunc)();
+        friend TOwnerClass;
+
     public:
-        operator T() { return val; }
-        T &operator=(const T &_other_val) { val = _other_val; return val; }
-    private:
-        T *operator&() { return &val; }
+        attribute(TType _val, TOwnerClass* _owner = nullptr, typename TGetFunc _get_func = nullptr, typename TSetFunc _set_func = nullptr);
+        operator TType();
+        TType &operator=(const TType &_other_val);
+
+    protected:
+        TType val;
+        TGetFunc get_func;
+        TSetFunc set_func;
+        TOwnerClass* owner;
+        TType *operator&();
     };
 
-    template<typename T, typename TGetFunc, typename TSetFunc>
-    class attribute2
+    template<class TOwnerClass, typename TType>
+    attribute<TOwnerClass, TType>::attribute(TType _val, TOwnerClass* _owner = nullptr, typename TGetFunc _get_func = nullptr, typename TSetFunc _set_func = nullptr)
+        : val(_val)
+        , owner(_owner)
+        , get_func(_get_func)
+        , set_func(_set_func)
+    {}
+
+    template<class TOwnerClass, typename TType>
+    attribute<TOwnerClass, TType>::operator TType()
     {
-    protected:
-        T val;
+        return get_func ? (owner->*get_func)() : val;
+    }
+
+    template<class TOwnerClass, typename TType>
+    TType &attribute<TOwnerClass, TType>::operator=(const TType &_other_val) {
+        if (set_func)
+        {
+            (owner->*set_func)(_other_val);
+        }
+        return val;
+    }
+
+    template<class TOwnerClass, typename TType>
+    TType *attribute<TOwnerClass, TType>::operator&() {
+        return &val;
+    }
+
+    template<class TOwnerClass>
+    class attribute<TOwnerClass, const tchar_t*>
+    {
+        typedef void (TOwnerClass::*TSetFunc)(const tchar_t*);
+        typedef const tchar_t*(TOwnerClass::*TGetFunc)();
+        friend TOwnerClass;
     public:
-        operator T() { return TGetFunc(*this); }
-        T &operator=(const T &_other_val) { TSetFunc(*this); return val; }
-    private:
-        T *operator&() { return &val; }
+        attribute(const tchar_t* _val, TOwnerClass* _owner = nullptr, typename TGetFunc _get_func = nullptr, typename TSetFunc _set_func = nullptr);
+        operator const tchar_t*();
+        const tchar_t* &operator=(const tchar_t* &_other_val);
+
+    protected:
+        tstring *operator&();
+        tstring val;
+        TGetFunc get_func;
+        TSetFunc set_func;
+        TOwnerClass* owner;
     };
+
+    template<class TOwnerClass>
+    attribute<TOwnerClass, const tchar_t*>::attribute(const tchar_t* _val, TOwnerClass* _owner = nullptr, typename TGetFunc _get_func = nullptr, typename TSetFunc _set_func = nullptr)
+        : val(_val)
+        , owner(_owner)
+        , get_func(_get_func)
+        , set_func(_set_func)
+    {}
+
+    template<class TOwnerClass>
+    attribute<TOwnerClass, const tchar_t*>::operator const tchar_t*()
+    {
+        return get_func ? (owner->*get_func)() : val.c_str();
+    }
+
+    template<class TOwnerClass>
+    const tchar_t*& attribute<TOwnerClass, const tchar_t*>::operator=(const tchar_t* &_other_val) {
+        if (set_func)
+        {
+            (owner->*set_func)(_other_val);
+        }
+        return val.c_str();
+    }
+
+    template<class TOwnerClass>
+    tstring *attribute<TOwnerClass, const tchar_t*>::operator&() {
+        return &val;
+    }
+
+#define ts_declare_attribute_and_callbacks(owner_type, type, name) \
+        attribute<owner_type, type> name; \
+        virtual void set_##name(type); \
+        virtual type get_##name();
+
+#define ts_init_attribute_and_callbacks(owner_type, name, val) \
+        name(val, this, &owner_type::get_##name, &owner_type::set_##name)
+
+#define ts_declare_attribute(owner_type, type, name) \
+        attribute<owner_type, type> name;
+
+#define ts_init_attribute(owner_type, name, val) \
+        name(val, this)
+
 };

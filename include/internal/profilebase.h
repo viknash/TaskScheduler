@@ -8,6 +8,7 @@
 // <summary></summary>
 // ***********************************************************************
 #pragma once
+#include "../platform.h"
 
 /// <summary>
 /// The task_scheduler namespace.
@@ -196,47 +197,36 @@ namespace task_scheduler
 
         };
 
-
-
         class domain
         {
         public:
-            typedef attribute2<const tchar_t*, domain::set_name, domain::get_name> Name;
-            //virtual const tchar_t* name(const tchar_t* _name = nullptr) {}
-        
-            virtual void set_name(const tchar_t* _name) {}
+            typedef void* handle;
 
-            Name name;
+            ts_declare_attribute_and_callbacks(domain, const tchar_t*, name);
+        
+            domain()
+                : ts_init_attribute_and_callbacks(domain, name, _t(""))
+                , hdl(nullptr)
+            {}
+
+            virtual handle& operator* () { return hdl; }
+
             template <class TKey>
             static domain* instance();
+        private:
+            handle hdl;
         };
 
-        class base_task
+        void domain::set_name(const tchar_t* _name)
         {
+            *&name = _name;
+        }
 
-        public:
+        const tchar_t* domain::get_name()
+        {
+            return (&name)->c_str();
+        }
 
-            base_task()
-            {
-            }
-
-            bool enter()
-            {
-                return true;
-            }
-
-            /// <summary>
-            /// Exits the specified storage.
-            /// </summary>
-            /// <param name="storage">The storage.</param>
-            /// <returns>bool.</returns>
-            bool exit()
-            {
-                return false;
-            }
-        };
-
-        typedef scoped_enter_exit< base_task > task_scoped_instrument;
 
     }
 

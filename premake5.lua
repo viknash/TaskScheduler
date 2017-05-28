@@ -93,7 +93,7 @@
 			{
 				"*.txt", "**.lua","**.md",
 				"samples/profile/**.h", "samples/profile/**.cpp",
-				"include/*.h",
+				"include/**.h",
                 "samples/common/**.h", "samples/common/**.cpp",
 				"deps/IntelSEAPI/ittnotify/include/*.h", "deps/IntelSEAPI/ittnotify/include/*.hpp", "deps/IntelSEAPI/ittnotify/include/*.cpp"
 			}

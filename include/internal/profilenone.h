@@ -76,6 +76,13 @@ namespace task_scheduler
         };
 
         typedef basic_string<null_string> string;
+
+        template <class TKey>
+        static domain* domain::instance()
+        {
+            static domain static_domain;
+            return &static_domain;
+        }
 #endif
 
     }
