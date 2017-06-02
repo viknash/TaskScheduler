@@ -66,21 +66,12 @@ int main()
     typedef base_thread_pool< default_mem_interface > thread_pool;
 
     get<profile::domain>()->name = _t("profile");
+    get<profile::memory, default_mem_interface>()->name = _t("profile");
 
     thread_pool pool(128);
     task_graph_type task_graph(pool);
     task_graph_helper_type task_graph_helper(task_graph);
     task_graph_helper.load(_t("tasks.txt"));
-
-    guarded_vector< void *, default_mem_interface > vector(128);
-    {
-        lock_free_batch_dispatcher< void *, guarded_vector< void *, default_mem_interface >, default_mem_interface >
-            dispatcher(vector);
-     //   size_t requested_batch_size = 1;
-      //  size_t returned_batch_size = 0;
-       // void** data = dispatcher.get_next_batch(requested_batch_size, returned_batch_size);
-    }
-    vector.push_back(nullptr);
 
     random_device rd;
     mt19937_64 gen(rd());

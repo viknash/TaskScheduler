@@ -128,6 +128,11 @@ namespace task_scheduler
         class memory
         {
         public:
+            ts_declare_attribute_and_callbacks(memory, const tchar_t*, name);
+
+            memory()
+                : ts_init_attribute_and_callbacks(memory, name, _t(""))
+            {}
 
             void suppress()
             {
@@ -137,10 +142,6 @@ namespace task_scheduler
             void unsuppress()
             {
                 get<errors>()->unsuppress(errors::memory);
-            }
-
-            virtual void set_name(const tchar_t* _name, tchar_t* _domain) {
-                ts_unused(_name); ts_unused(_domain);
             }
 
             virtual void allocate_begin(size_t _size, bool _initialized) {
@@ -154,6 +155,17 @@ namespace task_scheduler
             template <class TKey>
             static memory* instance();
         };
+
+
+        void memory::set_name(const tchar_t* _name)
+        {
+            *&name = _name;
+        }
+
+        const tchar_t* memory::get_name()
+        {
+            return (&name)->c_str();
+        }
 
         namespace thread
         {
@@ -209,7 +221,7 @@ namespace task_scheduler
                 , hdl(nullptr)
             {}
 
-            virtual handle& operator* () { return hdl; }
+            virtual handle operator* () { return hdl; }
 
             template <class TKey>
             static domain* instance();
@@ -226,6 +238,25 @@ namespace task_scheduler
         {
             return (&name)->c_str();
         }
+
+        class function
+        {
+            typedef void* handle;
+        public:
+            template <class TFuncType>
+            function(TFuncType _func)
+                : function_ptr((void*)_func)
+            {
+            }
+
+            typename handle& operator* ()
+            {
+                return function_ptr;
+            }
+
+        private:
+            void* function_ptr;
+        };
 
 
     }

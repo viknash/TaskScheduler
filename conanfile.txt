@@ -1,0 +1,7 @@
+[requires]
+premake/5.0.0-alpha9@eparayre/stable
+
+[options]
+
+[generators]
+txt

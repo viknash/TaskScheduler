@@ -83,6 +83,37 @@ namespace task_scheduler
             static domain static_domain;
             return &static_domain;
         }
+
+        struct task_param
+        {
+            task_param(function _func, const tchar_t* _task_id, const tchar_t* _parent_task_id, const tchar_t* _task_name)
+            {}
+        };
+
+        class task
+        {
+
+        public:
+
+            task()
+            {
+            }
+
+            bool enter(task_param& _param)
+            {
+                ts_unused(_param);
+                return true;
+            }
+
+            bool exit(task_param& _param)
+            {
+                ts_unused(_param);
+                return true;
+            }
+        };
+
+        typedef scoped_enter_exit< profile::task, profile::task_param > task_scoped_instrument;
+
 #endif
 
     }

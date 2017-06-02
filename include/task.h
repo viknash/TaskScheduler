@@ -17,6 +17,7 @@
 #include "meta.h"
 #include "print.h"
 #include "types.h"
+#include "profile.h"
 
 /// <summary>
 /// The task_scheduler namespace.
@@ -356,6 +357,7 @@ namespace task_scheduler
     template < class TMemInterface >
     bool base_task< TMemInterface >::operator()()
     {
+        profile::task_scoped_instrument profile_point(profile::task_param(nullptr, debug.task_name.c_str(), nullptr, debug.task_name.c_str()));
         return this->run();
     }
 

@@ -150,6 +150,12 @@ namespace task_scheduler
               class_type.enter(param);
         }
 
+        scoped_enter_exit(TParam &&_param)
+            : param(_param)
+        {
+            class_type.enter(param);
+        }
+
         /// <summary>
         /// Finalizes an instance of the <see cref="scoped_enter_exit"/> class.
         /// </summary>
@@ -206,7 +212,7 @@ namespace task_scheduler
         thread_unsafe_access_guard;
 
     template<class TInterface, class TKey = TInterface>
-    TInterface* get()
+    inline TInterface* get()
     {
         static TInterface* system = nullptr;
         if (!system)
@@ -214,6 +220,17 @@ namespace task_scheduler
             system = TInterface::instance<TKey>();
         }
         return system;
+    }
+
+    template<class TInterface, class TAsType, class TKey = TInterface>
+    inline TAsType* get_as()
+    {
+        static TAsType* system_as_type = nullptr;
+        if (!system_as_type)
+        {
+            system_as_type = static_cast<TAsType*>(get<TInterface, TKey>());
+        }
+        return system_as_type;
     }
 
     template<class TInterface, class TKey>
@@ -285,7 +302,7 @@ namespace task_scheduler
     public:
         attribute(const tchar_t* _val, TOwnerClass* _owner = nullptr, typename TGetFunc _get_func = nullptr, typename TSetFunc _set_func = nullptr);
         operator const tchar_t*();
-        const tchar_t* &operator=(const tchar_t* &_other_val);
+        attribute<TOwnerClass, const tchar_t*>& operator=(const tchar_t* _other_val);
 
     protected:
         tstring *operator&();
@@ -310,12 +327,12 @@ namespace task_scheduler
     }
 
     template<class TOwnerClass>
-    const tchar_t*& attribute<TOwnerClass, const tchar_t*>::operator=(const tchar_t* &_other_val) {
+    attribute<TOwnerClass, const tchar_t*>& attribute<TOwnerClass, const tchar_t*>::operator=(const tchar_t* _other_val) {
         if (set_func)
         {
             (owner->*set_func)(_other_val);
         }
-        return val.c_str();
+        return *this;
     }
 
     template<class TOwnerClass>

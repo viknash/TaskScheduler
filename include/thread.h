@@ -40,6 +40,7 @@ namespace task_scheduler
         typedef base_thread_pool< TMemInterface > thread_pool;
         typedef typename task_graph_type::task_memory_allocator_type task_memory_allocator_type;
         typedef thread_index_t< TMemInterface > thread_index_type;
+        typedef typename task_graph_type::task_vector task_vector;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="base_thread{TMemInterface}"/> struct.
@@ -134,6 +135,8 @@ namespace task_scheduler
           event sync_point;
 
           alarm execution;
+
+          task_vector temporary_task_list;
     };
 
     template < class TMemInterface >
@@ -304,7 +307,6 @@ namespace task_scheduler
             do
             {
                 task_type *stolen_task = nullptr;
-                std::vector< task_type * > temporary_queue;
                 bool touched_thread = false;
                 do
                 {
@@ -322,16 +324,17 @@ namespace task_scheduler
                         else
                         {
                             // Steal wrong task
-                            temporary_queue.push_back(stolen_task);
+                            temporary_task_list.push_back(stolen_task);
                         }
                     }
                 } while (!pool.threads[current_thread_index]->task_queue[priority]->empty());
 
-                for (auto task_ptr : temporary_queue)
+                for (auto task_ptr : temporary_task_list)
                 {
                     // Return tasks
                     pool.threads[current_thread_index]->task_queue[priority]->push_back(task_ptr);
                 }
+                temporary_task_list.clear();
 
                 // We have to wakeup the thread as long as its task queue is touched
                 // There could be task that was stolen and returned, but the thread went to sleep during the theft and

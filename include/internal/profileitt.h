@@ -63,19 +63,21 @@ namespace task_scheduler
         class memory_itt : public memory
         {
         public:
+            typedef memory super;
 
-            void set_name(const tchar_t* _name, tchar_t* _domain) override
-            {
-                heap = __itt_heap_function_create(_name, _domain);
-            }
+            void set_name(const tchar_t* _name) override;
 
             void allocate_begin(size_t _size, bool _initialized) override
             {
+                if (!heap)
+                    return;
                 __itt_heap_allocate_begin(heap, _size, _initialized ? 1 : 0);
             }
 
             void allocate_end(void** _memory_allocation, size_t _size, bool _initialized) override
             {
+                if (!heap)
+                    return;
                 __itt_heap_allocate_end(heap, _memory_allocation, _size, _initialized ? 1 : 0);
             }
 
@@ -90,18 +92,31 @@ namespace task_scheduler
             return &memory;
         }
 
+        void memory_itt::set_name(const tchar_t* _name)
+        {
+            super::set_name(_name);
+            const tchar_t* domain_name = domain::instance<domain>()->name;
+            heap = __itt_heap_function_create(_name, domain_name);
+        }
+
         class domain_itt : public domain
         {
             typedef domain super;
         public:
-            void set_name(const tchar_t* _name)
+            void set_name(const tchar_t* _name) override
             {
                 super::set_name(_name);
                 itt_domain = __itt_domain_create(_name);
             }
 
-            super::handle& operator* () override { 
-                return (super::handle&)itt_domain;
+            super::handle operator* () override { 
+                return (super::handle)itt_domain;
+            }
+
+            __itt_domain* get_domain() const
+            {
+                ts_assert(itt_domain);
+                return itt_domain;
             }
 
         private:
@@ -142,8 +157,8 @@ namespace task_scheduler
             id(const tchar_t* _name)
                 : itt_id(__itt_null)
             {
-                itt_id = __itt_id_make((void*)_name, thread_unique_number);
-                __itt_id_create(*get<domain>, itt_id);
+                itt_id = __itt_id_make(reinterpret_cast<void*>(const_cast<tchar_t*>(_name)), thread_unique_number);
+                __itt_id_create((get_as<domain, domain_itt>()->get_domain()), itt_id);
             }
 
             typename handle& operator* ()
@@ -155,31 +170,19 @@ namespace task_scheduler
             __itt_id itt_id;
         };
 
-        class function
-        {
-            typedef void* handle;
-        public:
-            template <class TFuncType>
-            function(TFuncType _func)
-                : function_ptr((void*) _func)
-            {
-            }
-
-            typename handle& operator* ()
-            {
-                return function_ptr;
-            }
-
-        private:
-            void* function_ptr;
-        };
-
         struct task_param
         {
-            function function;
+            function task_function;
             id task_id;
             id parent_task_id;
             string task_name;
+
+            task_param(function _func, const tchar_t* _task_id, const tchar_t* _parent_task_id, const tchar_t* _task_name)
+                : task_function(_func)
+                , task_id(_task_id)
+                , parent_task_id(_parent_task_id)
+                , task_name(_task_name)
+            {}
         };
 
         class task
@@ -193,25 +196,25 @@ namespace task_scheduler
 
             bool enter(task_param& _param)
             {
-                if (*_param.function)
+                if (*_param.task_function)
                 {
-                    __itt_task_begin_fn(*get<domain>, *_param.task_id, *_param.parent_task_id, *_param.function);
+                    __itt_task_begin_fn((get_as<domain, domain_itt>()->get_domain()), *_param.task_id, *_param.parent_task_id, *_param.task_function);
                 }
                 else
                 {
-                    __itt_task_begin(*get<domain>, *_param.task_id, *_param.parent_task_id, *_param.task_name);
+                    __itt_task_begin((get_as<domain, domain_itt>()->get_domain()), *_param.task_id, *_param.parent_task_id, *_param.task_name);
                 }
                 return true;
             }
 
             bool exit(task_param& param)
             {
-                __itt_task_end(*get<profile::domain>);
+                __itt_task_end((get_as<domain, domain_itt>()->get_domain()));
                 return true;
             }
         };
 
-        typedef scoped_enter_exit< task, task_param > task_scoped_instrument;
+        typedef scoped_enter_exit< profile::task, profile::task_param > task_scoped_instrument;
 
 #endif
 
